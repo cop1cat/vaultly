@@ -1,0 +1,33 @@
+[environment]
+python-version = "3.12"
+
+[src]
+include = ["vaultly", "tests"]
+exclude = [
+    "**/__pycache__/**",
+    "**/*.pyi",
+    "build/**",
+    "dist/**",
+]
+
+[rules]
+division-by-zero         = "error"
+invalid-argument-type    = "error"
+invalid-return-type      = "error"
+missing-argument         = "error"
+unknown-argument         = "error"
+invalid-assignment       = "error"
+index-out-of-bounds      = "error"
+unsupported-operator     = "error"
+call-non-callable        = "error"
+possibly-unbound         = "error"
+
+unused-ignore-comment    = "warn"
+deprecated               = "warn"
+
+unresolved-import        = "ignore"
+possibly-missing-import  = "ignore"
+
+[[overrides]]
+include = ["tests/**"]
+rules = { possibly-unbound = "warn" }
