@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 try:
     import boto3
+    from botocore.config import Config as BotoConfig
     from botocore.exceptions import BotoCoreError, ClientError
 except ImportError as e:  # pragma: no cover
     msg = (
@@ -55,6 +56,16 @@ _TRANSIENT_CODES = frozenset(
 _BATCH_LIMIT = 10  # SSM GetParameters hard limit
 
 
+# Sensible production defaults: bounded timeouts so a network hiccup doesn't
+# hang a service indefinitely, plus boto3's own adaptive retries for low-level
+# transport errors. Override via `config=` when you need something stricter.
+DEFAULT_CONFIG = BotoConfig(
+    retries={"mode": "adaptive", "max_attempts": 3},
+    connect_timeout=2.0,
+    read_timeout=5.0,
+)
+
+
 class AWSSSMBackend(Backend):
     def __init__(
         self,
@@ -62,10 +73,16 @@ class AWSSSMBackend(Backend):
         region_name: str | None = None,
         client: Any = None,
         with_decryption: bool = True,
+        config: BotoConfig | None = None,
     ) -> None:
-        self._client = client if client is not None else boto3.client(
-            "ssm", region_name=region_name
-        )
+        if client is not None:
+            self._client = client
+        else:
+            self._client = boto3.client(
+                "ssm",
+                region_name=region_name,
+                config=config if config is not None else DEFAULT_CONFIG,
+            )
         self.with_decryption = with_decryption
 
     def get(self, path: str, *, version: int | str | None = None) -> str:
@@ -83,8 +100,17 @@ class AWSSSMBackend(Backend):
         return resp["Parameter"]["Value"]
 
     def get_batch(self, paths: list[str]) -> dict[str, str]:
+        # SSM rejects duplicate names within a single GetParameters request;
+        # dedup while preserving order so callers can pass any sequence.
+        seen: set[str] = set()
+        unique: list[str] = []
+        for p in paths:
+            if p not in seen:
+                seen.add(p)
+                unique.append(p)
+
         out: dict[str, str] = {}
-        for chunk in _chunked(paths, _BATCH_LIMIT):
+        for chunk in _chunked(unique, _BATCH_LIMIT):
             try:
                 resp = self._client.get_parameters(
                     Names=chunk, WithDecryption=self.with_decryption

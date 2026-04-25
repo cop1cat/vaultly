@@ -146,3 +146,57 @@ def test_get_batch_also_retries():
 def test_invalid_max_attempts():
     with pytest.raises(ValueError, match="max_attempts"):
         RetryingBackend(FlakyBackend(), max_attempts=0)
+
+
+def test_invalid_total_timeout():
+    with pytest.raises(ValueError, match="total_timeout"):
+        RetryingBackend(FlakyBackend(), total_timeout=0)
+
+
+def test_total_timeout_short_circuits_long_backoff():
+    """If the next sleep would exceed the budget, give up immediately."""
+    inner = FlakyBackend(fail_times=10)
+    sleep = CapturingSleep()
+
+    # Fake monotonic clock so we control "elapsed" deterministically.
+    now = [0.0]
+
+    def fake_monotonic() -> float:
+        return now[0]
+
+    def fake_sleep(d: float) -> None:
+        sleep.delays.append(d)
+        now[0] += d
+
+    r = RetryingBackend(
+        inner,
+        max_attempts=10,
+        base_delay=1.0,
+        max_delay=10.0,
+        total_timeout=2.5,
+        jitter=False,
+        sleep=fake_sleep,
+        monotonic=fake_monotonic,
+        rng=lambda: 1.0,
+    )
+    with pytest.raises(TransientError):
+        r.get("/x")
+    # 1.0 sleep + 2.0 sleep would put us at t=3.0 (>2.5 budget) before the
+    # third sleep — so we sleep at most twice and bail.
+    assert sleep.delays == [1.0, 2.0] or sleep.delays == [1.0]
+
+
+def test_total_timeout_none_disables_budget():
+    inner = FlakyBackend(fail_times=4)
+    sleep = CapturingSleep()
+    r = RetryingBackend(
+        inner,
+        max_attempts=5,
+        base_delay=0.001,
+        max_delay=0.001,
+        total_timeout=None,
+        sleep=sleep,
+        rng=lambda: 1.0,
+    )
+    assert r.get("/x") == "ok"
+    assert inner.calls == 5

@@ -29,6 +29,7 @@ class FakeKVv2:
 class FakeClient:
     def __init__(self, store: dict[str, dict[str, Any]]) -> None:
         self.kv = FakeKVv2(store)
+        self.token: str | None = None
         # Mirror hvac.Client.secrets.kv.v2 access path.
         self.secrets = SimpleNamespace(kv=SimpleNamespace(v2=self.kv))
 
@@ -125,3 +126,55 @@ def test_get_batch_uses_default_serial_implementation():
     b = _backend({"a": {"value": "1"}, "b": {"value": "2"}})
     assert b.get_batch(["a", "b"]) == {"a": "1", "b": "2"}
     assert len(b._client.kv.calls) == 2
+
+
+# --------------------------------------------------------------------------- token renewal
+
+
+def test_token_factory_renews_on_unauthorized():
+    fc = FakeClient({"x": {"value": "v"}})
+    fc.token = "old"
+
+    # First call: 401. After token swap: success.
+    fail_first = [True]
+
+    def behavior_then_pass(**_kw: Any) -> dict[str, Any]:
+        if fail_first[0]:
+            fail_first[0] = False
+            raise hvac_exc.Unauthorized("expired")
+        return {"data": {"data": {"value": "v"}, "metadata": {}}}
+
+    fc.kv.read_secret_version = behavior_then_pass
+
+    factory_calls = [0]
+
+    def factory() -> str:
+        factory_calls[0] += 1
+        return "new-token"
+
+    b = VaultBackend(client=fc, token_factory=factory)
+    assert b.get("x") == "v"
+    assert factory_calls[0] == 1
+    assert fc.token == "new-token"
+
+
+def test_token_factory_failure_propagates_as_auth_error():
+    fc = FakeClient({"x": {"value": "v"}})
+    fc.kv.behavior = hvac_exc.Unauthorized("expired")
+
+    def factory() -> str:
+        msg = "no token for you"
+        raise RuntimeError(msg)
+
+    b = VaultBackend(client=fc, token_factory=factory)
+    with pytest.raises(AuthError, match="token_factory raised"):
+        b.get("x")
+
+
+def test_repeated_unauthorized_after_renewal_raises_auth_error():
+    fc = FakeClient({"x": {"value": "v"}})
+    fc.kv.behavior = hvac_exc.Unauthorized("nope")
+
+    b = VaultBackend(client=fc, token_factory=lambda: "still-bad")
+    with pytest.raises(AuthError, match="still rejects renewed token"):
+        b.get("x")

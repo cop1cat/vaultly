@@ -28,7 +28,10 @@ real Vault behaves like.
 
 from __future__ import annotations
 
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 try:
     import hvac
@@ -55,16 +58,68 @@ class VaultBackend(Backend):
         mount_point: str = "secret",
         default_key: str = "value",
         client: Any = None,
+        token_factory: Callable[[], str] | None = None,
     ) -> None:
+        """Initialize the Vault backend.
+
+        Args:
+            url: Vault server URL.
+            token: Static auth token.
+            mount_point: KV v2 mount point (default `"secret"`).
+            default_key: Field within the secret dict to return when the
+                path doesn't carry a `:key` suffix.
+            client: Pass a pre-configured `hvac.Client` instead of letting
+                us create one.
+            token_factory: Optional callable invoked when the current token
+                is rejected (`Unauthorized`). Should return a fresh token;
+                we install it on the client and retry the read once.
+                Use this with short-lived tokens (AppRole, K8s auth, etc.).
+        """
         if client is not None:
             self._client = client
         else:
             self._client = hvac.Client(url=url, token=token)
         self.mount_point = mount_point
         self.default_key = default_key
+        self._token_factory = token_factory
 
     def get(self, path: str, *, version: int | str | None = None) -> str:
         secret_path, key = self._split(path)
+        try:
+            resp = self._read(secret_path, version)
+        except hvac_exc.Unauthorized as e:
+            if self._token_factory is None:
+                msg = (
+                    f"Vault token is invalid or expired (reading {secret_path})"
+                )
+                raise AuthError(msg) from e
+            try:
+                self._client.token = self._token_factory()
+            except Exception as factory_err:
+                msg = (
+                    f"token_factory raised while renewing Vault token "
+                    f"(reading {secret_path}): {factory_err}"
+                )
+                raise AuthError(msg) from factory_err
+            try:
+                resp = self._read(secret_path, version)
+            except hvac_exc.Unauthorized as e2:
+                msg = (
+                    f"Vault still rejects renewed token (reading "
+                    f"{secret_path})"
+                )
+                raise AuthError(msg) from e2
+
+        data = resp.get("data", {}).get("data", {})
+        if key not in data:
+            msg = (
+                f"Vault path {secret_path!r} has no key {key!r} "
+                f"(found keys: {sorted(data)})"
+            )
+            raise SecretNotFoundError(msg)
+        return str(data[key])
+
+    def _read(self, secret_path: str, version: int | str | None) -> dict[str, Any]:
         # hvac expects an int for KV v2 versions; accept str at the API
         # surface and coerce so users can read versions from env vars etc.
         kw: dict[str, Any] = {
@@ -75,16 +130,15 @@ class VaultBackend(Backend):
         if version is not None:
             kw["version"] = int(version)
         try:
-            resp = self._client.secrets.kv.v2.read_secret_version(**kw)
+            return self._client.secrets.kv.v2.read_secret_version(**kw)
         except hvac_exc.InvalidPath as e:
             msg = f"Vault path not found: {secret_path}"
             raise SecretNotFoundError(msg) from e
         except hvac_exc.Forbidden as e:
             msg = f"Vault access denied for {secret_path}"
             raise AuthError(msg) from e
-        except hvac_exc.Unauthorized as e:
-            msg = f"Vault token is invalid or expired (reading {secret_path})"
-            raise AuthError(msg) from e
+        except hvac_exc.Unauthorized:
+            raise  # caller decides whether to retry via token_factory
         except hvac_exc.InternalServerError as e:
             msg = f"Vault server error reading {secret_path}: {e}"
             raise TransientError(msg) from e
@@ -93,15 +147,6 @@ class VaultBackend(Backend):
             raise TransientError(msg) from e
         except hvac_exc.VaultError as e:
             self._raise_unexpected(e, secret_path)
-
-        data = resp.get("data", {}).get("data", {})
-        if key not in data:
-            msg = (
-                f"Vault path {secret_path!r} has no key {key!r} "
-                f"(found keys: {sorted(data)})"
-            )
-            raise SecretNotFoundError(msg)
-        return str(data[key])
 
     @staticmethod
     def _raise_unexpected(e: hvac_exc.VaultError, secret_path: str) -> NoReturn:

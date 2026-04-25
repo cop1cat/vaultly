@@ -28,5 +28,14 @@ class Backend(ABC):
         """
 
     def get_batch(self, paths: list[str]) -> dict[str, str]:
-        """Fetch many paths at once (latest versions). Default: serial `get`."""
-        return {p: self.get(p) for p in paths}
+        """Fetch many paths at once (latest versions). Default: serial `get`.
+
+        Duplicates in `paths` are collapsed before fetching — backends with
+        a real batch API (e.g. SSM `GetParameters`) reject duplicate names,
+        and a single shared cache key suffices.
+        """
+        out: dict[str, str] = {}
+        for p in paths:
+            if p not in out:
+                out[p] = self.get(p)
+        return out
