@@ -39,3 +39,7 @@ addopts = "-ra --strict-markers"
 plugins = ["pydantic.mypy"]
 python_version = "3.12"
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore", "botocore.*", "hvac", "hvac.*", "moto", "moto.*"]
+ignore_missing_imports = true

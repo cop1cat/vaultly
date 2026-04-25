@@ -1,4 +1,12 @@
-"""vaultly — declarative Pydantic-native secrets manager."""
+"""vaultly — declarative Pydantic-native secrets manager.
+
+Optional backends (`AWSSSMBackend`, `VaultBackend`) live in their own
+submodules and import their SDKs lazily; they are not re-exported here so
+that `import vaultly` works without boto3 / hvac installed. Use:
+
+    from vaultly.backends.aws_ssm import AWSSSMBackend
+    from vaultly.backends.vault import VaultBackend
+"""
 
 from __future__ import annotations
 
