@@ -19,14 +19,22 @@ from __future__ import annotations
 import contextvars
 import logging
 import string
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PrivateAttr, SkipValidation
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    PrivateAttr,
+    SkipValidation,
+    model_validator,
+)
 
 from vaultly.backends.base import (
     Backend,  # noqa: TC001  needed at runtime by pydantic for model_rebuild
 )
-from vaultly.core.cache import TTLCache
+from vaultly.core.cache import KeyedLocks, TTLCache
 from vaultly.core.casts import cast_value
 from vaultly.core.secret import MISSING, _SecretSpec
 from vaultly.errors import ConfigError, MissingContextVariableError, TransientError
@@ -40,11 +48,12 @@ ValidateMode = Literal["none", "paths", "fetch"]
 _logger = logging.getLogger("vaultly")
 
 
-# True while a SecretModel's __init__ is in progress on the current stack.
-# Nested SecretModel hydration by Pydantic also goes through __init__; we use
-# this flag so that only the outermost call runs path validation / prefetch.
-_INIT_IN_PROGRESS: contextvars.ContextVar[bool] = contextvars.ContextVar(
-    "vaultly_init_in_progress", default=False
+# True while the outermost vaultly post-validation pass is in progress.
+# `model_validator(mode='after')` runs once per model in the tree (leaf to
+# root); this flag lets only the outermost call wire/validate/prefetch and
+# turns inner ones into no-ops.
+_FINALIZE_IN_PROGRESS: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "vaultly_finalize_in_progress", default=False
 )
 
 
@@ -75,19 +84,31 @@ class SecretModel(BaseModel):
 
     _root: SecretModel | None = PrivateAttr(default=None)
     _cache: TTLCache = PrivateAttr(default_factory=TTLCache)
+    _fetch_locks: KeyedLocks = PrivateAttr(default_factory=KeyedLocks)
 
     # Populated per-subclass by __pydantic_init_subclass__.
     __secret_fields__: ClassVar[dict[str, tuple[_SecretSpec, Any]]] = {}
 
-    # Override on subclasses: "none" skips everything, "paths" checks that
-    # every {var} resolves against the root's fields, "fetch" additionally
-    # prefetches all secrets via backend.get_batch at construction time.
+    # Subclass-level config — set via class kwargs:
+    #     class App(SecretModel, validate="fetch", stale_on_error=True): ...
+    # `validate`: "none" skips checks; "paths" verifies every {var} resolves
+    # against the root model (default); "fetch" additionally prefetches.
+    # `stale_on_error`: on TransientError, fall back to expired cached value.
     _vaultly_validate: ClassVar[ValidateMode] = "paths"
-
-    # When True, a TransientError from the backend falls back to the last
-    # cached (possibly expired) value with a warning log. Opt-in — some
-    # deployments prefer to fail fast on transient issues for security.
     _vaultly_stale_on_error: ClassVar[bool] = False
+
+    def __init_subclass__(
+        cls,
+        *,
+        validate: ValidateMode | None = None,
+        stale_on_error: bool | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+        if validate is not None:
+            cls._vaultly_validate = validate
+        if stale_on_error is not None:
+            cls._vaultly_stale_on_error = stale_on_error
 
     # ------------------------------------------------------------------ subclass hook
 
@@ -116,42 +137,60 @@ class SecretModel(BaseModel):
         if rebuild:
             cls.model_rebuild(force=True)
 
-    # ------------------------------------------------------------------ construction
+    # ------------------------------------------------------------------ post-validation
 
-    def __init__(self, **data: Any) -> None:
-        if _INIT_IN_PROGRESS.get():
-            # Being hydrated by a parent's __init__ — parent owns validation.
-            super().__init__(**data)
-            return
-        token = _INIT_IN_PROGRESS.set(True)
+    @model_validator(mode="after")
+    def _vaultly_finalize(self) -> Self:
+        """Wire the tree, validate paths, optionally prefetch.
+
+        `mode='after'` runs at the end of every successful validation —
+        whether triggered by `Foo(...)` (which goes through `__init__` →
+        `validate_python`) or by `Foo.model_validate({...})` (which calls
+        `validate_python` directly). It also fires for every nested model;
+        a ContextVar makes only the outermost call do work.
+        """
+        if _FINALIZE_IN_PROGRESS.get():
+            return self
+        token = _FINALIZE_IN_PROGRESS.set(True)
         try:
-            super().__init__(**data)
+            self._wire_tree(self)
+            mode: ValidateMode = getattr(type(self), "_vaultly_validate", "paths")
+            if mode == "none":
+                return self
+            root_fields = self._context_field_names()
+            try:
+                self._validate_own_paths(root_fields)
+            except MissingContextVariableError:
+                # Our own secrets reference {vars} we don't have. Could be
+                # a stand-alone bug, or this instance might still be wrapped
+                # into a parent later (rare but possible after construction).
+                # Either way, the first fetch will surface a clear error.
+                return self
+            self._validate_children_paths(root_fields)
+            if mode == "fetch":
+                self.prefetch()
         finally:
-            _INIT_IN_PROGRESS.reset(token)
-        mode: ValidateMode = getattr(type(self), "_vaultly_validate", "paths")
-        if mode == "none":
-            return
-        root_fields = self._context_field_names()
-        try:
-            self._validate_own_paths(root_fields)
-        except MissingContextVariableError:
-            # *Our own* secrets reference {vars} we don't have. Defer: the
-            # instance may become a nested child of a parent that provides
-            # them. If never wired, the first `fetch` surfaces the error.
-            return
-        # Errors in nested children are bugs in *this* tree — never defer.
-        self._validate_children_paths(root_fields)
-        if mode == "fetch":
-            self.prefetch()
+            _FINALIZE_IN_PROGRESS.reset(token)
+        return self
+
+    def _wire_tree(self, root: SecretModel) -> None:
+        self._root = None if root is self else root
+        for _, nested in self._iter_nested_secret_models():
+            nested._wire_tree(root)
 
     def model_post_init(self, __context: Any) -> None:
-        # Wire every immediate nested SecretModel field to this instance's
-        # effective root (either our own _root if we were wired by a parent,
-        # or ourselves if we are the root).
-        root = self._root if self._root is not None else self
-        for name, val in self._iter_nested_secret_models():
-            val._root = root
-            _ = name  # for potential future diagnostics
+        # No-op: wiring happens in the model_validator above so it runs on
+        # both the `__init__` and `model_validate` construction paths.
+        return
+
+    def model_copy(self, *, update: Any = None, deep: bool = False) -> Self:
+        msg = (
+            "vaultly: SecretModel.model_copy() is not supported — it would "
+            "duplicate the cache and break the _root linkage in nested "
+            "trees. Construct a fresh instance with the same fields and "
+            "backend instead."
+        )
+        raise NotImplementedError(msg)
 
     def _iter_nested_secret_models(self) -> Iterator[tuple[str, SecretModel]]:
         cls = type(self)
@@ -217,36 +256,44 @@ class SecretModel(BaseModel):
             raise MissingContextVariableError(msg) from None
         cache_key = _cache_key(resolved, spec.version)
         cache = root._cache
+        # Fast path — no lock needed when a fresh value is already cached.
         try:
             return cache.get(cache_key)
         except KeyError:
             pass
-        backend = root.backend
-        if backend is None:
-            msg = (
-                f"cannot fetch {_describe(cls, name, spec)}: "
-                f"no backend set on the root model"
-            )
-            raise ConfigError(msg)
-        try:
-            raw = backend.get(resolved, version=spec.version)
-        except TransientError as transient_err:
-            if getattr(type(root), "_vaultly_stale_on_error", False):
-                try:
-                    stale = cache.peek_expired(cache_key)
-                except KeyError:
-                    raise transient_err from None
-                _logger.warning(
-                    "vaultly: transient error fetching %s for %s; "
-                    "returning stale cached value",
-                    cache_key,
-                    _describe(cls, name, spec),
+        # Slow path — serialize concurrent backend fetches of the same key
+        # so we don't stampede the backend on cold cache.
+        with root._fetch_locks.for_key(cache_key):
+            try:
+                return cache.get(cache_key)
+            except KeyError:
+                pass
+            backend = root.backend
+            if backend is None:
+                msg = (
+                    f"cannot fetch {_describe(cls, name, spec)}: "
+                    f"no backend set on the root model"
                 )
-                return stale
-            raise
-        value = cast_value(raw, ann, spec.transform)
-        cache.set(cache_key, value, spec.ttl)
-        return value
+                raise ConfigError(msg)
+            try:
+                raw = backend.get(resolved, version=spec.version)
+            except TransientError as transient_err:
+                if getattr(type(root), "_vaultly_stale_on_error", False):
+                    try:
+                        stale = cache.peek_expired(cache_key)
+                    except KeyError:
+                        raise transient_err from None
+                    _logger.warning(
+                        "vaultly: transient error fetching %s for %s; "
+                        "returning stale cached value",
+                        cache_key,
+                        _describe(cls, name, spec),
+                    )
+                    return stale
+                raise
+            value = cast_value(raw, ann, spec.transform)
+            cache.set(cache_key, value, spec.ttl)
+            return value
 
     def _effective_root(self) -> SecretModel:
         return self._root if self._root is not None else self

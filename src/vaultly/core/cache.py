@@ -1,5 +1,9 @@
 """Thread-safe TTL cache keyed by resolved secret path.
 
+Also exposes `KeyedLocks` — a small helper that hands out a distinct
+`threading.Lock` per cache key, so concurrent fetches of the same secret
+on cold cache do not stampede the backend.
+
 TTL semantics:
   * `ttl=None`   — entry never expires.
   * `ttl=0`      — entry is stored with `expires == now`, so the next `get`
@@ -60,3 +64,25 @@ class TTLCache:
             if entry is None:
                 raise KeyError(key)
             return entry[0]
+
+
+class KeyedLocks:
+    """One `threading.Lock` per key. Hands the same lock back for repeat keys.
+
+    Used to serialize concurrent backend fetches of the same secret on cold
+    cache (the "thundering herd" — N readers hit the backend N times instead
+    of once). Locks accumulate forever; for paths bounded by model shape this
+    is fine.
+    """
+
+    def __init__(self) -> None:
+        self._locks: dict[str, threading.Lock] = {}
+        self._guard = threading.Lock()
+
+    def for_key(self, key: str) -> threading.Lock:
+        with self._guard:
+            lock = self._locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                self._locks[key] = lock
+            return lock
