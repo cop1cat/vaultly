@@ -24,14 +24,19 @@ class TTLCache:
         self._lock = threading.Lock()
 
     def get(self, key: str) -> Any:
-        """Return a fresh value or raise `KeyError` (miss or expired)."""
+        """Return a fresh value or raise `KeyError` (miss or expired).
+
+        Expired entries are *not* evicted here — they remain accessible via
+        `peek_expired`, which is what `stale_on_error` uses. They are
+        overwritten by the next successful `set`, or removed explicitly by
+        `invalidate` / `clear`.
+        """
         with self._lock:
             entry = self._data.get(key)
             if entry is None:
                 raise KeyError(key)
             value, expires = entry
             if expires is not None and time.monotonic() >= expires:
-                del self._data[key]
                 raise KeyError(key)
             return value
 

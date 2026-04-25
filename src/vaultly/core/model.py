@@ -17,6 +17,7 @@ Design notes live in PLAN.md and spike.py. Short version:
 from __future__ import annotations
 
 import contextvars
+import logging
 import string
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 
@@ -28,13 +29,15 @@ from vaultly.backends.base import (
 from vaultly.core.cache import TTLCache
 from vaultly.core.casts import cast_value
 from vaultly.core.secret import MISSING, _SecretSpec
-from vaultly.errors import ConfigError, MissingContextVariableError
+from vaultly.errors import ConfigError, MissingContextVariableError, TransientError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
 ValidateMode = Literal["none", "paths", "fetch"]
+
+_logger = logging.getLogger("vaultly")
 
 
 # True while a SecretModel's __init__ is in progress on the current stack.
@@ -65,6 +68,11 @@ class SecretModel(BaseModel):
     # every {var} resolves against the root's fields, "fetch" additionally
     # prefetches all secrets via backend.get_batch at construction time.
     _vaultly_validate: ClassVar[ValidateMode] = "paths"
+
+    # When True, a TransientError from the backend falls back to the last
+    # cached (possibly expired) value with a warning log. Opt-in — some
+    # deployments prefer to fail fast on transient issues for security.
+    _vaultly_stale_on_error: ClassVar[bool] = False
 
     # ------------------------------------------------------------------ subclass hook
 
@@ -203,7 +211,23 @@ class SecretModel(BaseModel):
                 f"cannot fetch {cls.__name__}.{name}: no backend set on the root model"
             )
             raise ConfigError(msg)
-        raw = backend.get(resolved)
+        try:
+            raw = backend.get(resolved)
+        except TransientError as transient_err:
+            if getattr(type(root), "_vaultly_stale_on_error", False):
+                try:
+                    stale = cache.peek_expired(resolved)
+                except KeyError:
+                    raise transient_err from None
+                _logger.warning(
+                    "vaultly: transient error fetching %s for %s.%s; "
+                    "returning stale cached value",
+                    resolved,
+                    cls.__name__,
+                    name,
+                )
+                return stale
+            raise
         value = cast_value(raw, ann, spec.transform)
         cache.set(resolved, value, spec.ttl)
         return value

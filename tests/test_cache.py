@@ -44,12 +44,20 @@ def test_ttl_positive_expires_after_window():
         c.get("/x")
 
 
-def test_expired_entry_is_evicted_on_get():
+def test_expired_entry_is_kept_for_peek():
+    """get() raises on expiry but keeps the entry around for peek_expired."""
     c = TTLCache()
     c.set("/x", "v", ttl=0)
     with pytest.raises(KeyError):
         c.get("/x")
-    # Subsequent peek_expired must also miss — entry truly gone.
+    # Still there for stale-on-error fallback.
+    assert c.peek_expired("/x") == "v"
+
+
+def test_invalidate_truly_removes_expired_entry():
+    c = TTLCache()
+    c.set("/x", "v", ttl=0)
+    c.invalidate("/x")
     with pytest.raises(KeyError):
         c.peek_expired("/x")
 
