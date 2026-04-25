@@ -63,14 +63,19 @@ class VaultBackend(Backend):
         self.mount_point = mount_point
         self.default_key = default_key
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, *, version: int | str | None = None) -> str:
         secret_path, key = self._split(path)
+        # hvac expects an int for KV v2 versions; accept str at the API
+        # surface and coerce so users can read versions from env vars etc.
+        kw: dict[str, Any] = {
+            "path": secret_path,
+            "mount_point": self.mount_point,
+            "raise_on_deleted_version": True,
+        }
+        if version is not None:
+            kw["version"] = int(version)
         try:
-            resp = self._client.secrets.kv.v2.read_secret_version(
-                path=secret_path,
-                mount_point=self.mount_point,
-                raise_on_deleted_version=True,
-            )
+            resp = self._client.secrets.kv.v2.read_secret_version(**kw)
         except hvac_exc.InvalidPath as e:
             msg = f"Vault path not found: {secret_path}"
             raise SecretNotFoundError(msg) from e

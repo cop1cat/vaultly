@@ -102,6 +102,31 @@ config.refresh_all()      # invalidate the whole cache
 * `0` — never cache; every access hits the backend.
 * `> 0` — seconds.
 
+## Versioning
+
+Pin a secret to a specific version:
+
+```python
+class AppConfig(SecretModel):
+    db_password: str = Secret("/db/password", version=2)
+```
+
+Versioned and unversioned reads of the same path are cached separately. SSM
+forwards the version as `Name=path:N`; Vault as `version=N` to KV v2; other
+backends ignore it. `prefetch()` falls back to serial `get` for versioned
+secrets (the batch APIs don't support per-path versions).
+
+## Description
+
+Free-text description that surfaces in error messages — useful in big models:
+
+```python
+db_password: str = Secret(
+    "/db/{stage}/password",
+    description="postgres prod credentials",
+)
+```
+
 ## Retries
 
 ```python

@@ -68,15 +68,17 @@ class AWSSSMBackend(Backend):
         )
         self.with_decryption = with_decryption
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        # SSM addresses versions by appending `:N` to the parameter name.
+        name = f"{path}:{version}" if version is not None else path
         try:
             resp = self._client.get_parameter(
-                Name=path, WithDecryption=self.with_decryption
+                Name=name, WithDecryption=self.with_decryption
             )
         except ClientError as e:
-            self._raise_mapped(e, context=path)
+            self._raise_mapped(e, context=name)
         except BotoCoreError as e:
-            msg = f"SSM connection error for {path}: {e}"
+            msg = f"SSM connection error for {name}: {e}"
             raise TransientError(msg) from e
         return resp["Parameter"]["Value"]
 

@@ -45,7 +45,7 @@ def test_cache_avoids_refetch():
     _ = c.db_password
     _ = c.db_password
     _ = c.db_password
-    assert b.calls == ["/db/prod/password"]
+    assert b.calls == [("/db/prod/password", None)]
 
 
 def test_masking_in_repr():
@@ -143,7 +143,9 @@ def test_refresh_all_clears_cache():
     c.refresh_all()
     _ = c.db_password
     _ = c.api_key
-    assert sorted(b.calls) == sorted(["/db/prod/password", "/services/openai/key"])
+    assert sorted(b.calls) == sorted(
+        [("/db/prod/password", None), ("/services/openai/key", None)]
+    )
 
 
 def test_refresh_unknown_field_raises():
@@ -162,7 +164,11 @@ def test_prefetch_populates_cache_via_batch():
     c.prefetch()
     # every secret path was fetched once; subsequent access uses cache
     assert sorted(b.calls) == sorted(
-        ["/db/prod/password", "/services/openai/key", "/db/prod/max_conns"]
+        [
+            ("/db/prod/password", None),
+            ("/services/openai/key", None),
+            ("/db/prod/max_conns", None),
+        ]
     )
     b.reset_calls()
     assert c.db_password == "s3cr3t"
@@ -179,10 +185,10 @@ def test_validate_fetch_prefetches_at_init():
 
     b = MockBackend({"/db/prod/password": "s3cr3t"})
     c = Eager(stage="prod", backend=b)
-    assert b.calls == ["/db/prod/password"]
+    assert b.calls == [("/db/prod/password", None)]
     # access is cache-only
     assert c.db_password == "s3cr3t"
-    assert b.calls == ["/db/prod/password"]
+    assert b.calls == [("/db/prod/password", None)]
 
 
 # --------------------------------------------------------------------------- nested models
@@ -220,7 +226,7 @@ def test_nested_shares_root_cache():
     c = NestedApp(stage="prod", db=DbConfig(), backend=b)
     _ = c.db.password
     _ = c.db.password
-    assert b.calls == ["/db/prod/password"]
+    assert b.calls == [("/db/prod/password", None)]
 
 
 def test_nested_missing_context_var_detected_at_root():

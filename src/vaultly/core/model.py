@@ -53,6 +53,21 @@ def _extract_vars(path: str) -> list[str]:
     return [name for _, name, _, _ in string.Formatter().parse(path) if name]
 
 
+def _cache_key(resolved_path: str, version: int | str | None) -> str:
+    """Compose a cache key that distinguishes versions of the same path."""
+    if version is None:
+        return resolved_path
+    return f"{resolved_path}@{version}"
+
+
+def _describe(cls: type, name: str, spec: _SecretSpec) -> str:
+    """Render a 'ClassName.field' label, optionally with the spec description."""
+    label = f"{cls.__name__}.{name}"
+    if spec.description:
+        return f"{label} ({spec.description})"
+    return label
+
+
 class SecretModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -195,41 +210,42 @@ class SecretModel(BaseModel):
         except KeyError as e:
             missing = e.args[0] if e.args else "?"
             msg = (
-                f"cannot resolve path for {cls.__name__}.{name}: "
+                f"cannot resolve path for {_describe(cls, name, spec)}: "
                 f"{{{missing}}} is not a field on the root model "
                 f"{type(root).__name__}"
             )
             raise MissingContextVariableError(msg) from None
+        cache_key = _cache_key(resolved, spec.version)
         cache = root._cache
         try:
-            return cache.get(resolved)
+            return cache.get(cache_key)
         except KeyError:
             pass
         backend = root.backend
         if backend is None:
             msg = (
-                f"cannot fetch {cls.__name__}.{name}: no backend set on the root model"
+                f"cannot fetch {_describe(cls, name, spec)}: "
+                f"no backend set on the root model"
             )
             raise ConfigError(msg)
         try:
-            raw = backend.get(resolved)
+            raw = backend.get(resolved, version=spec.version)
         except TransientError as transient_err:
             if getattr(type(root), "_vaultly_stale_on_error", False):
                 try:
-                    stale = cache.peek_expired(resolved)
+                    stale = cache.peek_expired(cache_key)
                 except KeyError:
                     raise transient_err from None
                 _logger.warning(
-                    "vaultly: transient error fetching %s for %s.%s; "
+                    "vaultly: transient error fetching %s for %s; "
                     "returning stale cached value",
-                    resolved,
-                    cls.__name__,
-                    name,
+                    cache_key,
+                    _describe(cls, name, spec),
                 )
                 return stale
             raise
         value = cast_value(raw, ann, spec.transform)
-        cache.set(resolved, value, spec.ttl)
+        cache.set(cache_key, value, spec.ttl)
         return value
 
     def _effective_root(self) -> SecretModel:
@@ -269,7 +285,7 @@ class SecretModel(BaseModel):
         spec, _ = cls.__secret_fields__[name]
         root = self._effective_root()
         resolved = spec.path.format(**root._context_values())
-        root._cache.invalidate(resolved)
+        root._cache.invalidate(_cache_key(resolved, spec.version))
         return self._fetch(name)
 
     def refresh_all(self) -> None:
@@ -277,9 +293,11 @@ class SecretModel(BaseModel):
         self._effective_root()._cache.clear()
 
     def prefetch(self) -> None:
-        """Eagerly fetch every secret in the tree via `backend.get_batch`.
+        """Eagerly fetch every secret in the tree.
 
-        Safe to call multiple times; uses the root's cache as usual.
+        Unversioned secrets are fetched in one `backend.get_batch` call;
+        versioned secrets fall back to serial `get`. Safe to call multiple
+        times; uses the root's cache as usual.
         """
         root = self._effective_root()
         backend = root.backend
@@ -291,13 +309,28 @@ class SecretModel(BaseModel):
         self._collect_paths(root._context_values(), owners)
         if not owners:
             return
-        unique = list({p for _, _, p in owners})
-        fetched = backend.get_batch(unique)
-        for owner, field_name, resolved in owners:
+
+        batched: list[tuple[SecretModel, str, str]] = []
+        versioned: list[tuple[SecretModel, str, str]] = []
+        for entry in owners:
+            owner, field_name, _ = entry
+            spec, _ann = type(owner).__secret_fields__[field_name]
+            (versioned if spec.version is not None else batched).append(entry)
+
+        if batched:
+            unique = list({p for _, _, p in batched})
+            fetched = backend.get_batch(unique)
+            for owner, field_name, resolved in batched:
+                spec, ann = type(owner).__secret_fields__[field_name]
+                raw = fetched[resolved]
+                value = cast_value(raw, ann, spec.transform)
+                root._cache.set(_cache_key(resolved, None), value, spec.ttl)
+
+        for owner, field_name, resolved in versioned:
             spec, ann = type(owner).__secret_fields__[field_name]
-            raw = fetched[resolved]
+            raw = backend.get(resolved, version=spec.version)
             value = cast_value(raw, ann, spec.transform)
-            root._cache.set(resolved, value, spec.ttl)
+            root._cache.set(_cache_key(resolved, spec.version), value, spec.ttl)
 
     def _collect_paths(
         self,

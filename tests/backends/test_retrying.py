@@ -21,7 +21,8 @@ class FlakyBackend(Backend):
         self.to_raise = to_raise
         self.calls = 0
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        del version
         self.calls += 1
         if self.calls <= self.fail_times:
             raise self.to_raise("boom")
@@ -125,7 +126,8 @@ def test_get_batch_also_retries():
             self.get_calls = 0
             self.batch_calls = 0
 
-        def get(self, path: str) -> str:
+        def get(self, path: str, *, version: int | str | None = None) -> str:
+            del version
             self.get_calls += 1
             return "v"
 

@@ -20,7 +20,9 @@ class EnvBackend(Backend):
     def __init__(self, prefix: str = "") -> None:
         self.prefix = prefix
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        # Env vars don't have versions; silently ignore the parameter.
+        del version
         key = self._to_env_key(path)
         value = os.environ.get(key)
         if value is None:

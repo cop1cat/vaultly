@@ -149,7 +149,7 @@ vaultlyError
 ## Scope v0.1
 
 **В ядре:**
-- `SecretModel`, `Secret`, pydantic-интеграция
+- `SecretModel`, `Secret` (с `version` и `description`), pydantic-интеграция
 - Интерполяция путей из полей модели + наследование во вложенных
 - TTL cache, refresh/refresh_all
 - Маскирование в repr / model_dump
@@ -171,7 +171,6 @@ vaultlyError
 - `AuditHandler` — для v0.1 достаточно `logger.debug/info`
 - Async (`aget_value`, `AsyncBackend`) — по запросу
 - `Secret[Path]` / `as_tempfile()` — рецепт в README
-- `version`, `alias`, `description` на Secret
 - `auto_backend()` по env — нестабильно
 - Остальные бэкенды: AWS Secrets Manager, Azure KV, GCP SM
 

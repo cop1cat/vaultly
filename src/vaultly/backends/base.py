@@ -1,8 +1,10 @@
 """Backend abstract base.
 
-Concrete backends implement `get(path) -> str`. `get_batch` has a default
-implementation that issues N serial `get` calls; backends with a real batch
-API (SSM's `GetParameters`, Vault's list+read, etc.) should override it.
+Concrete backends implement `get(path, *, version=None) -> str`. `get_batch`
+has a default implementation that issues N serial `get` calls; backends with
+a real batch API (SSM's `GetParameters`, Vault's list+read, etc.) should
+override it. Note that `get_batch` does *not* take a per-path version —
+versioned fetches always go through serial `get` calls.
 
 Backends are responsible for mapping their SDK exceptions into the vaultly
 hierarchy (`SecretNotFoundError`, `AuthError`, `TransientError`). Transport-
@@ -18,9 +20,13 @@ from abc import ABC, abstractmethod
 
 class Backend(ABC):
     @abstractmethod
-    def get(self, path: str) -> str:
-        """Return the raw string at `path` or raise a vaultly error."""
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        """Return the raw string at `path` or raise a vaultly error.
+
+        `version`, if given, pins to a specific version of the secret.
+        Backends that don't support versioning should ignore it.
+        """
 
     def get_batch(self, paths: list[str]) -> dict[str, str]:
-        """Fetch many paths at once. Default: serial `get` calls."""
+        """Fetch many paths at once (latest versions). Default: serial `get`."""
         return {p: self.get(p) for p in paths}

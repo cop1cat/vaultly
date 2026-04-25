@@ -15,7 +15,7 @@ def test_get_tracks_calls():
     b = MockBackend({"/x": "v"})
     b.get("/x")
     b.get("/x")
-    assert b.calls == ["/x", "/x"]
+    assert b.calls == [("/x", None), ("/x", None)]
 
 
 def test_missing_raises():
@@ -28,13 +28,26 @@ def test_missing_still_records_call():
     b = MockBackend({})
     with pytest.raises(SecretNotFoundError):
         b.get("/nope")
-    assert b.calls == ["/nope"]
+    assert b.calls == [("/nope", None)]
 
 
 def test_batch_default_uses_get():
     b = MockBackend({"/a": "1", "/b": "2"})
     assert b.get_batch(["/a", "/b"]) == {"/a": "1", "/b": "2"}
-    assert b.calls == ["/a", "/b"]
+    assert b.calls == [("/a", None), ("/b", None)]
+
+
+def test_get_with_version():
+    b = MockBackend(versions={("/x", 2): "v2", ("/x", 3): "v3"})
+    assert b.get("/x", version=2) == "v2"
+    assert b.get("/x", version=3) == "v3"
+    assert b.calls == [("/x", 2), ("/x", 3)]
+
+
+def test_versioned_miss():
+    b = MockBackend(versions={("/x", 1): "v1"})
+    with pytest.raises(SecretNotFoundError, match="@5"):
+        b.get("/x", version=5)
 
 
 def test_reset_calls():

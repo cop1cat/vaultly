@@ -18,7 +18,8 @@ class FlipBackend(Backend):
         self.fail = False
         self.calls = 0
 
-    def get(self, path: str) -> str:
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        del version
         self.calls += 1
         if self.fail:
             raise TransientError("outage")

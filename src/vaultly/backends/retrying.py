@@ -50,17 +50,21 @@ class RetryingBackend(Backend):
         self._sleep = sleep
         self._rng = rng
 
-    def get(self, path: str) -> str:
-        return self._retry(self.inner.get, (path,), path)
+    def get(self, path: str, *, version: int | str | None = None) -> str:
+        label = f"{path}@{version}" if version is not None else path
+        return self._retry(
+            lambda: self.inner.get(path, version=version),
+            label,
+        )
 
     def get_batch(self, paths: list[str]) -> dict[str, str]:
-        return self._retry(self.inner.get_batch, (paths,), repr(paths))
+        return self._retry(lambda: self.inner.get_batch(paths), repr(paths))
 
-    def _retry(self, fn, args, label):  # noqa: ANN001, ANN202  — internal helper
+    def _retry(self, fn, label):  # noqa: ANN001, ANN202  — internal helper
         last: TransientError | None = None
         for attempt in range(1, self.max_attempts + 1):
             try:
-                return fn(*args)
+                return fn()
             except TransientError as e:
                 last = e
                 if attempt == self.max_attempts:

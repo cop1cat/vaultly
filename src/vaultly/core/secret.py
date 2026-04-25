@@ -31,20 +31,31 @@ MISSING: Any = object()
 class _SecretSpec:
     """Metadata for a single secret field. Lives in `FieldInfo.metadata`."""
 
-    __slots__ = ("path", "transform", "ttl")
+    __slots__ = ("description", "path", "transform", "ttl", "version")
 
     def __init__(
         self,
         path: str,
         ttl: float | None,
         transform: Callable[[str], Any] | None,
+        version: int | str | None,
+        description: str | None,
     ) -> None:
         self.path = path
         self.ttl = ttl
         self.transform = transform
+        self.version = version
+        self.description = description
 
     def __repr__(self) -> str:
-        return f"_SecretSpec(path={self.path!r}, ttl={self.ttl!r})"
+        bits = [f"path={self.path!r}"]
+        if self.ttl is not None:
+            bits.append(f"ttl={self.ttl!r}")
+        if self.version is not None:
+            bits.append(f"version={self.version!r}")
+        if self.description is not None:
+            bits.append(f"description={self.description!r}")
+        return f"_SecretSpec({', '.join(bits)})"
 
 
 def Secret(
@@ -52,6 +63,8 @@ def Secret(
     *,
     ttl: float | None = None,
     transform: Callable[[str], Any] | None = None,
+    version: int | str | None = None,
+    description: str | None = None,
 ) -> Any:
     """Declare a secret-backed field.
 
@@ -62,12 +75,16 @@ def Secret(
             cache, `>0` = seconds.
         transform: Optional callable applied to the raw backend string,
             overriding the default type-based cast.
+        version: Pin to a specific version of the secret. Backends that
+            don't support versioning ignore this.
+        description: Free-text description; surfaces in error messages and
+            in the spec's `repr`. Useful for debugging large models.
 
     Returns:
         A Pydantic `FieldInfo` (typed as `Any` so it slots into `field: T = ...`
         declarations without complaints from type checkers).
     """
-    spec = _SecretSpec(path, ttl, transform)
+    spec = _SecretSpec(path, ttl, transform, version, description)
     info = Field(default=MISSING)
     info.metadata.append(spec)
     return info
