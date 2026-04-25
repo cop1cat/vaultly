@@ -41,5 +41,16 @@ python_version = "3.12"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["boto3", "boto3.*", "botocore", "botocore.*", "hvac", "hvac.*", "moto", "moto.*"]
+module = [
+    "boto3",
+    "boto3.*",
+    "botocore",
+    "botocore.*",
+    "hvac",
+    "hvac.*",
+    "moto",
+    "moto.*",
+    "requests",
+    "requests.*",
+]
 ignore_missing_imports = true
