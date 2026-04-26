@@ -121,18 +121,26 @@ class SecretModel(BaseModel):
             spec = next((m for m in field.metadata if isinstance(m, _SecretSpec)), None)
             if spec is None:
                 continue
-            secrets[name] = (spec, field.annotation)
-            # Dynamic Annotated construction — hide behind Any so mypy/ruff
-            # stay quiet; SkipValidation lets the sentinel through, and the
-            # PlainSerializer masks the value in model_dump / JSON.
-            any_annotated: Any = Annotated
-            any_skip: Any = SkipValidation
-            field.annotation = any_annotated[
-                any_skip[field.annotation],
-                PlainSerializer(lambda _v: "***", return_type=str, when_used="always"),
-            ]
-            field.default = MISSING
-            rebuild = True
+            # When a parent class already wrapped this field, `field.annotation`
+            # is the wrapped form (Annotated[SkipValidation[T], PlainSerializer]).
+            # `_SecretSpec.original_annotation` is captured on first wrap and
+            # is what `cast_value` must use.
+            if spec.original_annotation is None:
+                spec.original_annotation = field.annotation
+                # Dynamic Annotated construction — hide behind Any so mypy
+                # stays quiet. SkipValidation lets the sentinel through;
+                # PlainSerializer masks the value in model_dump / JSON.
+                any_annotated: Any = Annotated
+                any_skip: Any = SkipValidation
+                field.annotation = any_annotated[
+                    any_skip[field.annotation],
+                    PlainSerializer(
+                        lambda _v: "***", return_type=str, when_used="always"
+                    ),
+                ]
+                field.default = MISSING
+                rebuild = True
+            secrets[name] = (spec, spec.original_annotation)
         cls.__secret_fields__ = secrets
         if rebuild:
             cls.model_rebuild(force=True)
@@ -244,8 +252,28 @@ class SecretModel(BaseModel):
         cls = type(self)
         spec, ann = cls.__secret_fields__[name]
         root = self._effective_root()
+        resolved = self._resolve_path(cls, name, spec, root)
+        cache_key = _cache_key(resolved, spec.version)
+        # Fast path — no lock needed when a fresh value is already cached.
         try:
-            resolved = spec.path.format(**root._context_values())
+            return root._cache.get(cache_key)
+        except KeyError:
+            pass
+        # Slow path — serialize concurrent backend fetches of the same key
+        # so we don't stampede the backend on cold cache.
+        with root._fetch_locks.for_key(cache_key):
+            try:
+                return root._cache.get(cache_key)
+            except KeyError:
+                pass
+            return self._do_fetch(cls, name, spec, ann, root, resolved, cache_key)
+
+    def _resolve_path(
+        self, cls: type, name: str, spec: _SecretSpec, root: SecretModel
+    ) -> str:
+        del self  # only here so pyright stops complaining about staticmethod
+        try:
+            return spec.path.format(**root._context_values())
         except (KeyError, IndexError, AttributeError) as e:
             missing = e.args[0] if e.args else type(e).__name__
             msg = (
@@ -254,46 +282,45 @@ class SecretModel(BaseModel):
                 f"{type(root).__name__}"
             )
             raise MissingContextVariableError(msg) from None
-        cache_key = _cache_key(resolved, spec.version)
+
+    def _do_fetch(
+        self,
+        cls: type,
+        name: str,
+        spec: _SecretSpec,
+        ann: Any,
+        root: SecretModel,
+        resolved: str,
+        cache_key: str,
+    ) -> Any:
+        """Backend call + cast + cache write. Caller must hold the per-key lock."""
         cache = root._cache
-        # Fast path — no lock needed when a fresh value is already cached.
+        backend = root.backend
+        if backend is None:
+            msg = (
+                f"cannot fetch {_describe(cls, name, spec)}: "
+                f"no backend set on the root model"
+            )
+            raise ConfigError(msg)
         try:
-            return cache.get(cache_key)
-        except KeyError:
-            pass
-        # Slow path — serialize concurrent backend fetches of the same key
-        # so we don't stampede the backend on cold cache.
-        with root._fetch_locks.for_key(cache_key):
-            try:
-                return cache.get(cache_key)
-            except KeyError:
-                pass
-            backend = root.backend
-            if backend is None:
-                msg = (
-                    f"cannot fetch {_describe(cls, name, spec)}: "
-                    f"no backend set on the root model"
+            raw = backend.get(resolved, version=spec.version)
+        except TransientError as transient_err:
+            if getattr(type(root), "_vaultly_stale_on_error", False):
+                try:
+                    stale = cache.peek_expired(cache_key)
+                except KeyError:
+                    raise transient_err from None
+                _logger.warning(
+                    "vaultly: transient error fetching %s for %s; "
+                    "returning stale cached value",
+                    cache_key,
+                    _describe(cls, name, spec),
                 )
-                raise ConfigError(msg)
-            try:
-                raw = backend.get(resolved, version=spec.version)
-            except TransientError as transient_err:
-                if getattr(type(root), "_vaultly_stale_on_error", False):
-                    try:
-                        stale = cache.peek_expired(cache_key)
-                    except KeyError:
-                        raise transient_err from None
-                    _logger.warning(
-                        "vaultly: transient error fetching %s for %s; "
-                        "returning stale cached value",
-                        cache_key,
-                        _describe(cls, name, spec),
-                    )
-                    return stale
-                raise
-            value = cast_value(raw, ann, spec.transform)
-            cache.set(cache_key, value, spec.ttl)
-            return value
+                return stale
+            raise
+        value = cast_value(raw, ann, spec.transform)
+        cache.set(cache_key, value, spec.ttl)
+        return value
 
     def _effective_root(self) -> SecretModel:
         return self._root if self._root is not None else self
@@ -324,16 +351,23 @@ class SecretModel(BaseModel):
     # ------------------------------------------------------------------ public API
 
     def refresh(self, name: str) -> Any:
-        """Invalidate `name` in the cache and re-fetch from the backend."""
+        """Invalidate `name` in the cache and re-fetch from the backend.
+
+        Atomic against concurrent fetches: holds the per-key lock across
+        invalidate + fetch so a parallel `_fetch` can't slip in and
+        repopulate the cache with a stale value between the two steps.
+        """
         cls = type(self)
         if name not in cls.__secret_fields__:
             msg = f"{name!r} is not a secret field on {cls.__name__}"
             raise ValueError(msg)
-        spec, _ = cls.__secret_fields__[name]
+        spec, ann = cls.__secret_fields__[name]
         root = self._effective_root()
-        resolved = spec.path.format(**root._context_values())
-        root._cache.invalidate(_cache_key(resolved, spec.version))
-        return self._fetch(name)
+        resolved = self._resolve_path(cls, name, spec, root)
+        cache_key = _cache_key(resolved, spec.version)
+        with root._fetch_locks.for_key(cache_key):
+            root._cache.invalidate(cache_key)
+            return self._do_fetch(cls, name, spec, ann, root, resolved, cache_key)
 
     def refresh_all(self) -> None:
         """Invalidate every cached secret in this tree."""
@@ -373,8 +407,17 @@ class SecretModel(BaseModel):
                 value = cast_value(raw, ann, spec.transform)
                 root._cache.set(_cache_key(resolved, None), value, spec.ttl)
 
+        # Dedup versioned entries by (resolved_path, version). Two fields
+        # pointing at the same versioned secret would otherwise hit the
+        # backend twice with identical args.
+        seen_versioned: set[tuple[str, int | str]] = set()
         for owner, field_name, resolved in versioned:
             spec, ann = type(owner).__secret_fields__[field_name]
+            assert spec.version is not None  # filtered above
+            key = (resolved, spec.version)
+            if key in seen_versioned:
+                continue
+            seen_versioned.add(key)
             raw = backend.get(resolved, version=spec.version)
             value = cast_value(raw, ann, spec.transform)
             root._cache.set(_cache_key(resolved, spec.version), value, spec.ttl)

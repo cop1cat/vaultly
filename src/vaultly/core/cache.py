@@ -71,8 +71,13 @@ class KeyedLocks:
 
     Used to serialize concurrent backend fetches of the same secret on cold
     cache (the "thundering herd" — N readers hit the backend N times instead
-    of once). Locks accumulate forever; for paths bounded by model shape this
-    is fine.
+    of once).
+
+    Locks accumulate as you fetch new keys. For most apps the set of resolved
+    paths is bounded by model shape and this is fine. If your `{var}`
+    interpolations spray across many distinct values (multi-tenant systems
+    keying by `tenant_id`, etc.), call `discard(key)` when you know a key is
+    dead, or `clear()` at the appropriate boundary, to release the locks.
     """
 
     def __init__(self) -> None:
@@ -86,3 +91,22 @@ class KeyedLocks:
                 lock = threading.Lock()
                 self._locks[key] = lock
             return lock
+
+    def discard(self, key: str) -> None:
+        """Drop the lock for `key`. No-op if absent or currently held."""
+        with self._guard:
+            lock = self._locks.get(key)
+            if lock is None:
+                return
+            # Don't drop a lock that's currently held — would stall whoever
+            # owns it. acquire(blocking=False) tells us if it's free.
+            if lock.acquire(blocking=False):
+                try:
+                    del self._locks[key]
+                finally:
+                    lock.release()
+
+    def clear(self) -> None:
+        """Drop all locks. Use only when no fetch is in flight."""
+        with self._guard:
+            self._locks.clear()

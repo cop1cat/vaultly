@@ -29,9 +29,22 @@ MISSING: Any = object()
 
 
 class _SecretSpec:
-    """Metadata for a single secret field. Lives in `FieldInfo.metadata`."""
+    """Metadata for a single secret field. Lives in `FieldInfo.metadata`.
 
-    __slots__ = ("description", "path", "transform", "ttl", "version")
+    `original_annotation` is captured the first time a model class wraps the
+    field for masking. Subclasses that inherit the field see only the wrapped
+    annotation in `field.annotation`; this slot lets them recover the
+    original `int` / `dict` / `bool` / etc. for casting.
+    """
+
+    __slots__ = (
+        "description",
+        "original_annotation",
+        "path",
+        "transform",
+        "ttl",
+        "version",
+    )
 
     def __init__(
         self,
@@ -46,6 +59,7 @@ class _SecretSpec:
         self.transform = transform
         self.version = version
         self.description = description
+        self.original_annotation: Any = None
 
     def __repr__(self) -> str:
         bits = [f"path={self.path!r}"]
