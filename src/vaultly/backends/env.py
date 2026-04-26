@@ -2,9 +2,11 @@
 
 Paths are mapped to env var names by stripping leading/trailing slashes,
 replacing inner slashes with underscores, and uppercasing. An optional
-`prefix` is prepended verbatim.
+`prefix` is prepended; a single underscore is auto-inserted between prefix
+and key unless the prefix already ends with one.
 
     /db/prod/password                  -> DB_PROD_PASSWORD
+    EnvBackend(prefix="MYAPP")  + /key -> MYAPP_KEY
     EnvBackend(prefix="MYAPP_") + /key -> MYAPP_KEY
 """
 
@@ -31,4 +33,9 @@ class EnvBackend(Backend):
         return value
 
     def _to_env_key(self, path: str) -> str:
-        return self.prefix + path.strip("/").replace("/", "_").upper()
+        base = path.strip("/").replace("/", "_").upper()
+        if not self.prefix:
+            return base
+        if self.prefix.endswith("_"):
+            return self.prefix + base
+        return f"{self.prefix}_{base}"

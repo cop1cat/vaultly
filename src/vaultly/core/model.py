@@ -246,8 +246,8 @@ class SecretModel(BaseModel):
         root = self._effective_root()
         try:
             resolved = spec.path.format(**root._context_values())
-        except KeyError as e:
-            missing = e.args[0] if e.args else "?"
+        except (KeyError, IndexError, AttributeError) as e:
+            missing = e.args[0] if e.args else type(e).__name__
             msg = (
                 f"cannot resolve path for {_describe(cls, name, spec)}: "
                 f"{{{missing}}} is not a field on the root model "

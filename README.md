@@ -79,7 +79,12 @@ Custom: `Secret("/x", transform=...)` replaces the default rule entirely.
 
 ## Validation modes
 
-Set on a subclass via `_vaultly_validate`:
+Set on a subclass via class kwargs:
+
+```python
+class AppConfig(SecretModel, validate="fetch", stale_on_error=True):
+    ...
+```
 
 * `"paths"` (default) — verify every `{var}` resolves at construction.
 * `"fetch"` — additionally `prefetch()` everything via `backend.get_batch`
@@ -152,8 +157,7 @@ Opt in per model. When the backend raises `TransientError` and the cache
 holds an expired value, return that with a warning log instead of failing:
 
 ```python
-class AppConfig(SecretModel):
-    _vaultly_stale_on_error = True
+class AppConfig(SecretModel, stale_on_error=True):
     db_password: str = Secret("/db/password", ttl=60)
 ```
 
@@ -186,3 +190,64 @@ VaultlyError
 ```
 
 Each backend maps SDK exceptions into this hierarchy.
+
+## Security model
+
+What vaultly **does** mask:
+
+- `repr(model)`, `str(model)` — secret fields render as `"***"`.
+- `model.model_dump()` and `model.model_dump_json()` — same.
+
+What vaultly **does not** mask:
+
+- A secret field accessed directly (`model.db_password`) is a plain `str`.
+  `print(model.db_password)`, log lines, exception messages, and template
+  expansions can leak it. We chose `str` over `pydantic.SecretStr` so that
+  downstream code (DB drivers, HTTP clients) Just Works — but the
+  responsibility to not log it is yours.
+- Pickling and `copy.deepcopy` — pydantic will serialize the entire model
+  including the in-memory cache and the backend instance. Cached values
+  are stored unencrypted; don't pickle live `SecretModel` instances.
+- `model_copy()` is disabled (raises `NotImplementedError`) for the same
+  reason — it would duplicate cache state and break nested-root linkage.
+- Process memory — secret strings are not zeroed when evicted; this is
+  Python's general posture and would require C-extensions to fix.
+- Logger output — `vaultly` uses the `vaultly` logger and emits paths (not
+  values) at WARNING level for stale-on-error and retries. Resolved paths
+  may contain context like `{stage}` / tenant id; configure your logger
+  if you treat those as PII:
+
+  ```python
+  import logging
+  logging.getLogger("vaultly").addFilter(my_pii_scrubber)
+  ```
+
+## Concurrency
+
+- Cache reads and writes are protected by a per-cache `threading.Lock`.
+- Cold-cache fetches are serialized per resolved key — N threads asking
+  for the same uncached secret produce exactly one backend call.
+- Hot-path reads (cache hit) take only the cache lock and return without
+  touching the per-key fetch lock.
+- Async is not yet supported (planned for v0.2). Today, fetches inside an
+  event loop will block; wrap calls in `asyncio.to_thread` if needed.
+
+## Construction paths
+
+vaultly's path validation, `_root` wiring, and optional `prefetch` run via
+a Pydantic `model_validator(mode='after')`, which fires for both:
+
+- `AppConfig(stage="prod", backend=...)` (calls `__init__` then validators)
+- `AppConfig.model_validate({...})` and `.model_validate_json(...)` (skip
+  `__init__`, go straight to validators)
+
+`AppConfig.model_construct(...)` skips all validation by Pydantic design.
+You'll get an instance back, but path checks and prefetch don't run; the
+first attribute access surfaces any errors lazily.
+
+## Breaking-change policy (pre-1.0)
+
+Before 1.0, the public API may change between minor versions. The
+`Backend.get(path, *, version=None)` signature in particular is a candidate
+for revision (a future `SecretQuery`-shaped argument is on the table).
+Pin the patch version in production until 1.0.

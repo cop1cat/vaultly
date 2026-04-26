@@ -4,9 +4,30 @@ version = "0.1.0"
 description = "Declarative Pydantic-native secrets manager"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Dmitri Spiridonov" }]
+keywords = ["secrets", "config", "pydantic", "aws", "ssm", "vault"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "pydantic>=2.6",
 ]
+
+[project.urls]
+Homepage = "https://github.com/dspiridonov/vaultly"
+Repository = "https://github.com/dspiridonov/vaultly"
+Issues = "https://github.com/dspiridonov/vaultly/issues"
+Changelog = "https://github.com/dspiridonov/vaultly/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 aws = ["boto3>=1.34"]
@@ -30,6 +51,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vaultly"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/vaultly/py.typed" = "vaultly/py.typed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

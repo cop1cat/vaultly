@@ -21,9 +21,14 @@ def test_no_leading_slash(monkeypatch):
     assert EnvBackend().get("api/key") == "k"
 
 
-def test_prefix(monkeypatch):
+def test_prefix_with_trailing_underscore(monkeypatch):
     monkeypatch.setenv("MYAPP_DB_PASSWORD", "p")
     assert EnvBackend(prefix="MYAPP_").get("/db/password") == "p"
+
+
+def test_prefix_auto_inserts_underscore(monkeypatch):
+    monkeypatch.setenv("MYAPP_DB_PASSWORD", "p")
+    assert EnvBackend(prefix="MYAPP").get("/db/password") == "p"
 
 
 def test_missing_raises(monkeypatch):
