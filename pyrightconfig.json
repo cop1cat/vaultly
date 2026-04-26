@@ -1,0 +1,10 @@
+{
+  "include": ["src", "tests"],
+  "exclude": ["**/__pycache__", ".venv", "build", "dist"],
+  "executionEnvironments": [
+    {
+      "root": "tests/integration",
+      "reportArgumentType": "none"
+    }
+  ]
+}

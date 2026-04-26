@@ -450,18 +450,25 @@ class SecretModel(BaseModel):
 
         if batched:
             unique = list({p for _, _, p in batched})
-            fetched = backend.get_batch(unique)
-            for owner, field_name, resolved in batched:
-                spec, ann = type(owner).__secret_fields__[field_name]
-                raw = fetched[resolved]
-                cls = type(owner)
-                value = _cast_or_wrap(raw, ann, spec, cls, field_name)
-                cache_key = _cache_key(resolved, None)
-                # Hold the per-key lock so a concurrent _fetch can't slip
-                # in between our backend call and our cache.set, hit the
-                # backend a second time, and overwrite our value.
-                with root._fetch_locks.for_key(cache_key):
-                    root._cache.set(cache_key, value, spec.ttl)
+            cache_keys = [_cache_key(p, None) for p in unique]
+            # Acquire every per-key lock BEFORE calling get_batch, so a
+            # concurrent `_fetch` can't slip in during the network round
+            # trip and double-fetch the same path. Using RLock means the
+            # acquire-many-at-once pattern is safe from this thread.
+            locks = [root._fetch_locks.for_key(k) for k in cache_keys]
+            for lock in locks:
+                lock.acquire()
+            try:
+                fetched = backend.get_batch(unique)
+                for owner, field_name, resolved in batched:
+                    spec, ann = type(owner).__secret_fields__[field_name]
+                    raw = fetched[resolved]
+                    cls = type(owner)
+                    value = _cast_or_wrap(raw, ann, spec, cls, field_name)
+                    root._cache.set(_cache_key(resolved, None), value, spec.ttl)
+            finally:
+                for lock in reversed(locks):
+                    lock.release()
 
         # Dedup versioned entries by (resolved_path, version). Two fields
         # pointing at the same versioned secret would otherwise hit the
