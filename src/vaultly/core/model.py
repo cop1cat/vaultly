@@ -37,7 +37,12 @@ from vaultly.backends.base import (
 from vaultly.core.cache import KeyedLocks, TTLCache
 from vaultly.core.casts import cast_value
 from vaultly.core.secret import MISSING, _SecretSpec
-from vaultly.errors import ConfigError, MissingContextVariableError, TransientError
+from vaultly.errors import (
+    ConfigError,
+    MissingContextVariableError,
+    TransientError,
+    VaultlyError,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,6 +51,13 @@ if TYPE_CHECKING:
 ValidateMode = Literal["none", "paths", "fetch"]
 
 _logger = logging.getLogger("vaultly")
+
+_COPY_DENY_MSG = (
+    "vaultly: copying a SecretModel is not supported — it would either "
+    "share or duplicate the cache and break the _root linkage in nested "
+    "trees. Construct a fresh instance with the same fields and backend "
+    "instead. (`model_copy`, `copy.copy`, and `copy.deepcopy` all raise.)"
+)
 
 
 # True while the outermost vaultly post-validation pass is in progress.
@@ -75,6 +87,22 @@ def _describe(cls: type, name: str, spec: _SecretSpec) -> str:
     if spec.description:
         return f"{label} ({spec.description})"
     return label
+
+
+def _cast_or_wrap(
+    raw: str, ann: Any, spec: _SecretSpec, cls: type, name: str
+) -> Any:
+    """Call `cast_value` and wrap any non-Vaultly exception as `ConfigError`."""
+    try:
+        return cast_value(raw, ann, spec.transform)
+    except VaultlyError:
+        raise
+    except Exception as e:
+        msg = (
+            f"failed to cast value for {_describe(cls, name, spec)}: "
+            f"{type(e).__name__}: {e}"
+        )
+        raise ConfigError(msg) from e
 
 
 class SecretModel(BaseModel):
@@ -148,8 +176,13 @@ class SecretModel(BaseModel):
     # ------------------------------------------------------------------ post-validation
 
     @model_validator(mode="after")
-    def _vaultly_finalize(self) -> Self:
+    def _vaultly_finalize_internal(self) -> Self:
         """Wire the tree, validate paths, optionally prefetch.
+
+        Named with a `_vaultly_…_internal` suffix to make accidental override
+        in user subclasses unlikely. If you DO override this, the tree is
+        no longer wired and nested fetch will fail. If you need a custom
+        post-validator, declare it with a different name — both will run.
 
         `mode='after'` runs at the end of every successful validation —
         whether triggered by `Foo(...)` (which goes through `__init__` →
@@ -192,13 +225,18 @@ class SecretModel(BaseModel):
         return
 
     def model_copy(self, *, update: Any = None, deep: bool = False) -> Self:
-        msg = (
-            "vaultly: SecretModel.model_copy() is not supported — it would "
-            "duplicate the cache and break the _root linkage in nested "
-            "trees. Construct a fresh instance with the same fields and "
-            "backend instead."
-        )
-        raise NotImplementedError(msg)
+        raise NotImplementedError(_COPY_DENY_MSG)
+
+    def __copy__(self) -> Self:
+        # `copy.copy(model)` would share the same `_cache`, `_root`, and
+        # `_fetch_locks` with the source — mutating one would mutate the
+        # other. Block to enforce a clean construction story.
+        raise NotImplementedError(_COPY_DENY_MSG)
+
+    def __deepcopy__(self, memo: Any = None) -> Self:
+        # Pydantic's default deepcopy currently fails on the threading.Lock
+        # inside our cache, but that's accidental — pin the contract.
+        raise NotImplementedError(_COPY_DENY_MSG)
 
     def _iter_nested_secret_models(self) -> Iterator[tuple[str, SecretModel]]:
         cls = type(self)
@@ -318,7 +356,7 @@ class SecretModel(BaseModel):
                 )
                 return stale
             raise
-        value = cast_value(raw, ann, spec.transform)
+        value = _cast_or_wrap(raw, ann, spec, cls, name)
         cache.set(cache_key, value, spec.ttl)
         return value
 
@@ -404,8 +442,14 @@ class SecretModel(BaseModel):
             for owner, field_name, resolved in batched:
                 spec, ann = type(owner).__secret_fields__[field_name]
                 raw = fetched[resolved]
-                value = cast_value(raw, ann, spec.transform)
-                root._cache.set(_cache_key(resolved, None), value, spec.ttl)
+                cls = type(owner)
+                value = _cast_or_wrap(raw, ann, spec, cls, field_name)
+                cache_key = _cache_key(resolved, None)
+                # Hold the per-key lock so a concurrent _fetch can't slip
+                # in between our backend call and our cache.set, hit the
+                # backend a second time, and overwrite our value.
+                with root._fetch_locks.for_key(cache_key):
+                    root._cache.set(cache_key, value, spec.ttl)
 
         # Dedup versioned entries by (resolved_path, version). Two fields
         # pointing at the same versioned secret would otherwise hit the
@@ -418,9 +462,12 @@ class SecretModel(BaseModel):
             if key in seen_versioned:
                 continue
             seen_versioned.add(key)
-            raw = backend.get(resolved, version=spec.version)
-            value = cast_value(raw, ann, spec.transform)
-            root._cache.set(_cache_key(resolved, spec.version), value, spec.ttl)
+            cls = type(owner)
+            cache_key = _cache_key(resolved, spec.version)
+            with root._fetch_locks.for_key(cache_key):
+                raw = backend.get(resolved, version=spec.version)
+                value = _cast_or_wrap(raw, ann, spec, cls, field_name)
+                root._cache.set(cache_key, value, spec.ttl)
 
     def _collect_paths(
         self,

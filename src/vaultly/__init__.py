@@ -23,6 +23,7 @@ from vaultly.errors import (
     TransientError,
     VaultlyError,
 )
+from vaultly.testing.mock import MockBackend
 
 __all__ = [
     "AuthError",
@@ -30,6 +31,7 @@ __all__ = [
     "ConfigError",
     "EnvBackend",
     "MissingContextVariableError",
+    "MockBackend",
     "RetryingBackend",
     "Secret",
     "SecretModel",

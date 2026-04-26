@@ -205,6 +205,11 @@ What vaultly **does not** mask:
   expansions can leak it. We chose `str` over `pydantic.SecretStr` so that
   downstream code (DB drivers, HTTP clients) Just Works — but the
   responsibility to not log it is yours.
+- `vars(model)` and `model.__dict__` bypass `__getattribute__` and expose
+  the internal `MISSING` sentinel for unfetched fields (and fetched values
+  are stored in the cache, not in `__dict__`, so you'll always see the
+  sentinel there). Use `model.model_dump()` for introspection — it goes
+  through the masking serializer.
 - Pickling and `copy.deepcopy` — pydantic will serialize the entire model
   including the in-memory cache and the backend instance. Cached values
   are stored unencrypted; don't pickle live `SecretModel` instances.
