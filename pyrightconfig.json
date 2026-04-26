@@ -5,6 +5,10 @@
     {
       "root": "tests/integration",
       "reportArgumentType": "none"
+    },
+    {
+      "root": "tests/regression",
+      "reportArgumentType": "none"
     }
   ]
 }
