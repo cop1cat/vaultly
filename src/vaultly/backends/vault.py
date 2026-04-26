@@ -28,6 +28,7 @@ real Vault behaves like.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, NoReturn
 
 if TYPE_CHECKING:
@@ -117,7 +118,7 @@ class VaultBackend(Backend):
                 f"(found keys: {sorted(data)})"
             )
             raise SecretNotFoundError(msg)
-        return str(data[key])
+        return _normalize(data[key])
 
     def _read(self, secret_path: str, version: int | str | None) -> dict[str, Any]:
         # hvac expects an int for KV v2 versions; accept str at the API
@@ -162,3 +163,20 @@ class VaultBackend(Backend):
             secret_path, _, key = path.rpartition(":")
             return secret_path, key
         return path, self.default_key
+
+
+def _normalize(val: Any) -> str:
+    """Project Vault's JSON-typed value down to the string our cast layer wants.
+
+    Vault's KV v2 stores arbitrary JSON, so a single secret entry can be a
+    dict, list, int, bool, etc. — not just a string. `Backend.get` must
+    return `str`, but `cast_value` will then `json.loads` for `dict` / `list`
+    fields and `int(...)` for numeric fields. So:
+      * `str`  -> return as-is (so that `cast_value` for `str` round-trips
+                  cleanly without picking up extra JSON quotes).
+      * other  -> `json.dumps` so dicts and lists stay valid JSON, numbers
+                  and bools serialize to their textual form.
+    """
+    if isinstance(val, str):
+        return val
+    return json.dumps(val)

@@ -10,12 +10,19 @@ that `import vaultly` works without boto3 / hvac installed. Use:
 
 from __future__ import annotations
 
-from vaultly.backends.base import Backend
-from vaultly.backends.env import EnvBackend
-from vaultly.backends.retrying import RetryingBackend
-from vaultly.core.model import SecretModel
-from vaultly.core.secret import Secret
-from vaultly.errors import (
+import logging as _logging
+
+# Standard library practice: ship a NullHandler so emit-without-config
+# does not flood stderr via the lastResort handler. Apps that *want* to
+# see vaultly logs can attach their own handler / set propagate=True.
+_logging.getLogger("vaultly").addHandler(_logging.NullHandler())
+
+from vaultly.backends.base import Backend  # noqa: E402
+from vaultly.backends.env import EnvBackend  # noqa: E402
+from vaultly.backends.retrying import RetryingBackend  # noqa: E402
+from vaultly.core.model import SecretModel  # noqa: E402
+from vaultly.core.secret import Secret  # noqa: E402
+from vaultly.errors import (  # noqa: E402
     AuthError,
     ConfigError,
     MissingContextVariableError,
@@ -23,7 +30,7 @@ from vaultly.errors import (
     TransientError,
     VaultlyError,
 )
-from vaultly.testing.mock import MockBackend
+from vaultly.testing.mock import MockBackend  # noqa: E402
 
 __all__ = [
     "AuthError",

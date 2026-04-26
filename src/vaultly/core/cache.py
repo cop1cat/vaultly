@@ -67,11 +67,17 @@ class TTLCache:
 
 
 class KeyedLocks:
-    """One `threading.Lock` per key. Hands the same lock back for repeat keys.
+    """One `threading.RLock` per key. Hands the same lock back for repeat keys.
 
     Used to serialize concurrent backend fetches of the same secret on cold
     cache (the "thundering herd" — N readers hit the backend N times instead
     of once).
+
+    Reentrant by design: a non-reentrant `Lock` would deadlock if a user's
+    `transform=` callable calls back into the model's `refresh` for the same
+    key. With `RLock`, the recursive acquire succeeds and the user gets
+    runtime semantics they can debug, not a hang. (Pure `transform`
+    callables remain the recommended discipline.)
 
     Locks accumulate as you fetch new keys. For most apps the set of resolved
     paths is bounded by model shape and this is fine. If your `{var}`
@@ -81,14 +87,14 @@ class KeyedLocks:
     """
 
     def __init__(self) -> None:
-        self._locks: dict[str, threading.Lock] = {}
+        self._locks: dict[str, threading.RLock] = {}
         self._guard = threading.Lock()
 
-    def for_key(self, key: str) -> threading.Lock:
+    def for_key(self, key: str) -> threading.RLock:
         with self._guard:
             lock = self._locks.get(key)
             if lock is None:
-                lock = threading.Lock()
+                lock = threading.RLock()
                 self._locks[key] = lock
             return lock
 

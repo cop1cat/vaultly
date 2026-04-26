@@ -187,17 +187,32 @@ def test_keyed_locks_discard_releases_unheld_lock():
 
 
 def test_keyed_locks_discard_skips_held_lock():
+    """`discard` from one thread must refuse to drop a lock held by another."""
     from vaultly.core.cache import KeyedLocks
 
     locks = KeyedLocks()
     lock = locks.for_key("/x")
-    lock.acquire()
+
+    holder_acquired = threading.Event()
+    holder_release = threading.Event()
+
+    def hold() -> None:
+        lock.acquire()
+        try:
+            holder_acquired.set()
+            holder_release.wait(timeout=2.0)
+        finally:
+            lock.release()
+
+    t = threading.Thread(target=hold)
+    t.start()
+    holder_acquired.wait(timeout=2.0)
     try:
-        locks.discard("/x")
-        # Still the same lock — discard refused because it was held.
-        assert locks.for_key("/x") is lock
+        locks.discard("/x")  # called from main thread; lock held by t
+        assert locks.for_key("/x") is lock  # not dropped
     finally:
-        lock.release()
+        holder_release.set()
+        t.join()
 
 
 def test_keyed_locks_clear():

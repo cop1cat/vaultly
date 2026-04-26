@@ -234,9 +234,21 @@ class SecretModel(BaseModel):
         raise NotImplementedError(_COPY_DENY_MSG)
 
     def __deepcopy__(self, memo: Any = None) -> Self:
-        # Pydantic's default deepcopy currently fails on the threading.Lock
+        # Pydantic's default deepcopy currently fails on the threading.RLock
         # inside our cache, but that's accidental — pin the contract.
         raise NotImplementedError(_COPY_DENY_MSG)
+
+    def __reduce__(self) -> Any:
+        # Block pickle: a pickled SecretModel would carry the resolved
+        # cleartext cache to disk or the wire. RLock currently happens to
+        # make pickle fail at runtime, but pin the contract explicitly so
+        # a future refactor doesn't silently enable a security footgun.
+        msg = (
+            "vaultly: pickling a SecretModel is not supported — it would "
+            "serialize the in-memory cleartext cache. Ship the constructor "
+            "inputs and reconstruct on the other side instead."
+        )
+        raise NotImplementedError(msg)
 
     def _iter_nested_secret_models(self) -> Iterator[tuple[str, SecretModel]]:
         cls = type(self)
