@@ -11,36 +11,33 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 First public release.
 
-### Highlights
+### Added
 
-- Mix regular Pydantic fields with secret-backed fields in one model.
-  Secrets fetch lazily on first access, cache with a per-field TTL, and
-  mask in `repr` / `model_dump` / JSON output.
+#### Core: `SecretModel` and `Secret`
+
+- `SecretModel` base class — mix regular Pydantic fields with secret-backed
+  fields in one model. Secrets fetch lazily on first access, cache with a
+  per-field TTL, and mask in `repr` / `model_dump` / JSON output.
+- `Secret(path, *, ttl, transform, version, description)` field marker.
 - A secret-typed field is the actual type you declared (`str`, `int`,
-  `dict`, …) — not a `SecretStr`-style proxy. Drivers and HTTP clients
-  use the value directly, no adapters needed.
+  `dict`, …) — not a `SecretStr`-style proxy.
 - Path templates (`Secret("/{stage}/db/password")`) interpolate from the
   root model's non-secret fields. Validation at construction catches
   typos before they become 3-a.m. paging.
-- Anything that would otherwise leak the in-memory cache is blocked
-  outright: `pickle.dumps`, `copy.copy`, `copy.deepcopy`, and
-  `model_copy()` all raise `NotImplementedError`.
-
-### `SecretModel`
-
-- `Secret(path, *, ttl, transform, version, description)` field marker.
 - `prefetch()` for eager loading; `refresh(name)` and `refresh_all()`
   for cache invalidation after rotation.
-- Validation modes set via class kwargs:
+- Validation modes via class kwargs:
   `class App(SecretModel, validate="fetch", stale_on_error=True)`.
 - Nested `SecretModel` children share the root's backend, cache, and
   path-interpolation context.
-- Thread-safe TTL cache, per-key reentrant fetch locks (no thundering
+- Thread-safe TTL cache; per-key reentrant fetch locks (no thundering
   herd on cold cache).
 - Validation runs on every construction path — both `Foo(...)` and
   `Foo.model_validate({...})` / `model_validate_json(...)`.
+- `pickle.dumps`, `copy.copy`, `copy.deepcopy`, and `model_copy()` all
+  raise `NotImplementedError` to keep the in-memory cache from leaking.
 
-### Backends
+#### Backends
 
 - `EnvBackend` — environment variables with optional prefix.
 - `MockBackend` — in-memory dict with `(path, version)` call tracking
@@ -59,29 +56,32 @@ First public release.
   deployments where idle TCP connections get dropped by an LB.
 - `Backend` ABC for custom backends.
 
-### Errors
+#### Errors
 
-```
-VaultlyError
-├── ConfigError
-│   └── MissingContextVariableError
-├── SecretNotFoundError       # not retried
-├── AuthError                 # not retried
-└── TransientError            # retried by RetryingBackend
-```
+- Hierarchy:
+  ```
+  VaultlyError
+  ├── ConfigError
+  │   └── MissingContextVariableError
+  ├── SecretNotFoundError       # not retried
+  ├── AuthError                 # not retried
+  └── TransientError            # retried by RetryingBackend
+  ```
+- Each backend maps SDK exceptions into this hierarchy.
+- Cast / `transform` failures are wrapped as `ConfigError` so callers'
+  `except VaultlyError` catches them; the original is preserved as
+  `__cause__`.
 
-Each backend maps SDK exceptions into this hierarchy. Cast / `transform`
-failures are wrapped as `ConfigError` so callers' `except VaultlyError`
-catches them; the original is preserved as `__cause__`.
-
-### Tooling
+#### Tooling
 
 - `py.typed` marker so downstream `mypy` / `pyright` pick up the
   annotations.
 - Documentation site (mkdocs-material), versioned per release tag via
   `mike` with a `latest` alias.
 
-### Known limitations
+### Notes
+
+#### Known limitations
 
 - `model_construct()` skips Pydantic's full validation by design — the
   path checks and prefetch don't run. Errors surface lazily on the
