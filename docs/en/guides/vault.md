@@ -91,6 +91,40 @@ If the renewed token is also rejected, vaultly raises `AuthError`. If
 `token_factory` itself raises, that surfaces as `AuthError` with the
 factory's exception preserved as `__cause__`.
 
+## Connection management
+
+By default `VaultBackend` keeps a single long-lived `hvac.Client` (and
+its underlying `requests.Session`) for its entire lifetime. For
+frequently-reading services this is the right call — the TLS handshake
+amortizes across reads.
+
+For **infrequent reads** (once per hour) an idle TCP connection through
+an NLB / ELB / proxy may get dropped. The first request after the gap
+then fails with a network error (vaultly surfaces it as `TransientError`,
+so the retry layer recovers — but it's noise). Two ways to avoid that:
+
+```python
+# Option 1: recreate the client when the gap between calls exceeds 5 min.
+backend = VaultBackend(url=..., token=..., idle_timeout=300.0)
+
+# Option 2: a fresh client per call. Costlier per-read latency, but
+# never trips on a dead socket.
+backend = VaultBackend(url=..., token=..., reuse_connection=False)
+```
+
+Extra kwargs can be forwarded to the hvac client via `client_kwargs=`:
+
+```python
+backend = VaultBackend(
+    url="https://vault.example.com",
+    token="...",
+    client_kwargs={"verify": "/etc/ca/vault-ca.pem"},
+)
+```
+
+If you pass your own `client=...`, these three knobs are ignored — you
+own the client's lifecycle.
+
 ## Versioning
 
 KV v2 stores every write as a new version. Pin a specific one:
