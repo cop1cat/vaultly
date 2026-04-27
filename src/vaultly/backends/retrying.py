@@ -76,7 +76,9 @@ class RetryingBackend(Backend):
             on_retry: Callback fired before each retry sleep, with
                 `(attempt, exc, delay)`. Use it to record metrics or push
                 breadcrumbs. Runs synchronously; keep it cheap.
-            sleep / rng / monotonic: Override-points for tests.
+            sleep: Override-point for tests; replaces `time.sleep`.
+            rng: Override-point for tests; replaces `random.random`.
+            monotonic: Override-point for tests; replaces `time.monotonic`.
 
         Raises:
             ValueError: If `max_attempts < 1` or `total_timeout <= 0`.
