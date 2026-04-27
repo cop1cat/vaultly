@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/backends/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/backends/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/backends/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/caching/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/caching/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/caching/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/errors/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/errors/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/errors/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/path-interpolation/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/path-interpolation/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/path-interpolation/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/secret-marker/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/secret-marker/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/secret-marker/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/concepts/secret-model/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/concepts/secret-model/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/concepts/secret-model/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/getting-started/installation/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/getting-started/installation/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/getting-started/installation/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/getting-started/quickstart/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/getting-started/quickstart/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/getting-started/quickstart/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/aws-ssm/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/aws-ssm/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/aws-ssm/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/choosing-a-backend/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/choosing-a-backend/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/choosing-a-backend/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/concurrency/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/concurrency/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/concurrency/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/nested-config/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/nested-config/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/nested-config/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/retries-and-stale/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/retries-and-stale/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/retries-and-stale/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/security-model/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/security-model/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/security-model/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/testing/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/testing/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/testing/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/guides/vault/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/guides/vault/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/guides/vault/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/reference/api/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0/reference/api/"/>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0ru/reference/api/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/backends/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/backends/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/backends/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/caching/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/caching/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/caching/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/errors/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/errors/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/errors/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/path-interpolation/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/path-interpolation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/path-interpolation/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/secret-marker/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/secret-marker/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/secret-marker/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/secret-model/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/concepts/secret-model/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0concepts/secret-model/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/getting-started/installation/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/getting-started/installation/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0getting-started/installation/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/getting-started/quickstart/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/getting-started/quickstart/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0getting-started/quickstart/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/aws-ssm/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/aws-ssm/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/aws-ssm/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/choosing-a-backend/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/choosing-a-backend/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/choosing-a-backend/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/concurrency/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/concurrency/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/concurrency/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/nested-config/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/nested-config/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/nested-config/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/retries-and-stale/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/retries-and-stale/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/retries-and-stale/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/security-model/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/security-model/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/security-model/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/testing/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/testing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/testing/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/guides/vault/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/guides/vault/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0guides/vault/"/>
+    </url>
+    <url>
+        <loc>https://cop1cat.github.io/vaultly/1.0.0/ru/reference/api/</loc>
+        <lastmod>2026-04-27</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="ru" href="https://cop1cat.github.io/vaultly/1.0.0/ru/reference/api/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://cop1cat.github.io/vaultly/1.0.0reference/api/"/>
+    </url>
+</urlset>
