@@ -1478,7 +1478,7 @@ afford to block, wrap in <code>asyncio.to_thread</code>:</p>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Inside an async handler:</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">db_pw</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">to_thread</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">db_password</span><span class="p">)</span>
 </code></pre></div>
-<p>A native async API is on the v0.2 roadmap.</p>
+<p>A native async API is on the roadmap.</p>
 <h2 id="process-boundaries">Process boundaries<a class="headerlink" href="#process-boundaries" title="Permanent link">&para;</a></h2>
 <p>vaultly doesn't share state across processes. Each process is its own
 cache:</p>

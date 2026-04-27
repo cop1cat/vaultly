@@ -1558,7 +1558,7 @@
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">token</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;VAULT_TOKEN&quot;</span><span class="p">],</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">)</span>
 </code></pre></div>
-<p>vaultly speaks <strong>KV v2</strong>. KV v1 is not supported in v0.1.</p>
+<p>vaultly speaks <strong>KV v2</strong>. KV v1 is not supported.</p>
 <h2 id="pathkey-syntax"><code>path:key</code> syntax<a class="headerlink" href="#pathkey-syntax" title="Permanent link">&para;</a></h2>
 <p>Vault stores each secret as a <strong>dict of key/value pairs</strong> at a given path.
 A single <code>Backend.get</code> returns one string, so we have two ways to project a

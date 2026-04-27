@@ -1560,7 +1560,7 @@
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">token</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;VAULT_TOKEN&quot;</span><span class="p">],</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">)</span>
 </code></pre></div>
-<p>vaultly работает с <strong>KV v2</strong>. KV v1 в v0.1 не поддерживается.</p>
+<p>vaultly работает с <strong>KV v2</strong>. KV v1 не поддерживается.</p>
 <h2 id="pathkey">Синтаксис <code>path:key</code><a class="headerlink" href="#pathkey" title="Permanent link">&para;</a></h2>
 <p>Vault хранит каждый секрет как <strong>dict пар key/value</strong> на конкретном
 пути. Один <code>Backend.get</code> возвращает одну строку — поэтому есть два
