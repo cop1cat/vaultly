@@ -62,6 +62,20 @@ def test_refresh_actually_refetches():
     assert backend.calls == [("/prod/db/password", None)]
 ```
 
+`MockBackend.reset_calls()` clears the call list without touching the data,
+which is handy when a test does some warmup before the assertion-worthy
+phase:
+
+```python
+def test_only_count_post_warmup_calls():
+    backend = MockBackend({"/k": "v"})
+    app = App(backend=backend)
+    _ = app.k             # warmup
+    backend.reset_calls() # only count what happens next
+    app.refresh("k")
+    assert backend.calls == [("/k", None)]
+```
+
 ## Versioned secrets
 
 Pass a separate `versions=` dict for pinned versions:

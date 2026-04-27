@@ -210,11 +210,10 @@ What vaultly **does not** mask:
   are stored in the cache, not in `__dict__`, so you'll always see the
   sentinel there). Use `model.model_dump()` for introspection — it goes
   through the masking serializer.
-- Pickling and `copy.deepcopy` — pydantic will serialize the entire model
-  including the in-memory cache and the backend instance. Cached values
-  are stored unencrypted; don't pickle live `SecretModel` instances.
-- `model_copy()` is disabled (raises `NotImplementedError`) for the same
-  reason — it would duplicate cache state and break nested-root linkage.
+- `pickle.dumps(model)`, `copy.copy(model)`, `copy.deepcopy(model)`, and
+  `model.model_copy()` all raise `NotImplementedError`. Each would either
+  share or duplicate the in-memory cleartext cache and break nested-root
+  linkage. Construct a fresh instance instead.
 - Process memory — secret strings are not zeroed when evicted; this is
   Python's general posture and would require C-extensions to fix.
 - Logger output — `vaultly` uses the `vaultly` logger and emits paths (not

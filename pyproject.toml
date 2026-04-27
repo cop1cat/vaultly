@@ -8,7 +8,6 @@ license = { file = "LICENSE" }
 authors = [{ name = "Dmitri Spiridonov" }]
 keywords = ["secrets", "config", "pydantic", "aws", "ssm", "vault"]
 classifiers = [
-    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -25,6 +24,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/dspiridonov/vaultly"
+Documentation = "https://dspiridonov.github.io/vaultly/"
 Repository = "https://github.com/dspiridonov/vaultly"
 Issues = "https://github.com/dspiridonov/vaultly/issues"
 Changelog = "https://github.com/dspiridonov/vaultly/blob/main/CHANGELOG.md"
