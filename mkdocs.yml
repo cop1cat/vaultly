@@ -1,14 +1,13 @@
 site_name: vaultly
 site_description: Declarative Pydantic-native secrets manager for Python.
-site_url: https://dspiridonov.github.io/vaultly/
-repo_url: https://github.com/dspiridonov/vaultly
-repo_name: dspiridonov/vaultly
+site_url: https://cop1cat.github.io/vaultly/
+repo_url: https://github.com/cop1cat/vaultly
+repo_name: cop1cat/vaultly
 docs_dir: docs
 edit_uri: edit/main/docs/
 
 theme:
   name: material
-  language: en
   features:
     - navigation.tabs
     - navigation.sections
@@ -75,27 +74,61 @@ plugins:
             show_signature_annotations: true
             separate_signature: true
             merge_init_into_class: true
-
-nav:
-  - Home: index.md
-  - Getting started:
-      - Installation: getting-started/installation.md
-      - Quickstart: getting-started/quickstart.md
-  - Concepts:
-      - SecretModel: concepts/secret-model.md
-      - Secret marker: concepts/secret-marker.md
-      - Backends: concepts/backends.md
-      - Path interpolation: concepts/path-interpolation.md
-      - Caching: concepts/caching.md
-      - Errors: concepts/errors.md
-  - Guides:
-      - Choosing a backend: guides/choosing-a-backend.md
-      - AWS SSM Parameter Store: guides/aws-ssm.md
-      - HashiCorp Vault: guides/vault.md
-      - Retries and stale-on-error: guides/retries-and-stale.md
-      - Nested config trees: guides/nested-config.md
-      - Concurrency: guides/concurrency.md
-      - Security model: guides/security-model.md
-      - Testing your config: guides/testing.md
-  - Reference:
-      - API: reference/api.md
+  - i18n:
+      docs_structure: folder
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+          build: true
+          nav:
+            - Home: index.md
+            - Getting started:
+                - Installation: getting-started/installation.md
+                - Quickstart: getting-started/quickstart.md
+            - Concepts:
+                - SecretModel: concepts/secret-model.md
+                - Secret marker: concepts/secret-marker.md
+                - Backends: concepts/backends.md
+                - Path interpolation: concepts/path-interpolation.md
+                - Caching: concepts/caching.md
+                - Errors: concepts/errors.md
+            - Guides:
+                - Choosing a backend: guides/choosing-a-backend.md
+                - AWS SSM Parameter Store: guides/aws-ssm.md
+                - HashiCorp Vault: guides/vault.md
+                - Retries and stale-on-error: guides/retries-and-stale.md
+                - Nested config trees: guides/nested-config.md
+                - Concurrency: guides/concurrency.md
+                - Security model: guides/security-model.md
+                - Testing your config: guides/testing.md
+            - Reference:
+                - API: reference/api.md
+        - locale: ru
+          name: Русский
+          build: true
+          nav:
+            - Главная: index.md
+            - Начало работы:
+                - Установка: getting-started/installation.md
+                - Быстрый старт: getting-started/quickstart.md
+            - Концепции:
+                - SecretModel: concepts/secret-model.md
+                - Маркер Secret: concepts/secret-marker.md
+                - Бэкенды: concepts/backends.md
+                - Интерполяция путей: concepts/path-interpolation.md
+                - Кэширование: concepts/caching.md
+                - Ошибки: concepts/errors.md
+            - Руководства:
+                - Выбор бэкенда: guides/choosing-a-backend.md
+                - AWS SSM Parameter Store: guides/aws-ssm.md
+                - HashiCorp Vault: guides/vault.md
+                - Ретраи и stale-on-error: guides/retries-and-stale.md
+                - Вложенные модели конфига: guides/nested-config.md
+                - Конкурентность: guides/concurrency.md
+                - Модель безопасности: guides/security-model.md
+                - Тестирование конфига: guides/testing.md
+            - Справочник:
+                - API: reference/api.md

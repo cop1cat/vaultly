@@ -200,3 +200,116 @@ def test_total_timeout_none_disables_budget():
     )
     assert r.get("/x") == "ok"
     assert inner.calls == 5
+
+
+# --------------------------------------------------------------------------- custom is_retryable
+
+
+def test_custom_is_retryable_widens_to_secret_not_found():
+    """E.g. retry SecretNotFoundError on a freshly-written eventually-
+    consistent backend."""
+    inner = FlakyBackend(fail_times=2, to_raise=SecretNotFoundError)
+    r = RetryingBackend(
+        inner,
+        max_attempts=5,
+        base_delay=0.001,
+        max_delay=0.001,
+        sleep=lambda _d: None,
+        is_retryable=lambda exc: isinstance(
+            exc, (TransientError, SecretNotFoundError)
+        ),
+    )
+    assert r.get("/x") == "ok"
+    assert inner.calls == 3
+
+
+def test_custom_is_retryable_narrows_default():
+    """E.g. don't retry anything — surface even TransientError immediately."""
+    inner = FlakyBackend(fail_times=10)
+    r = RetryingBackend(
+        inner,
+        max_attempts=5,
+        base_delay=0.001,
+        max_delay=0.001,
+        sleep=lambda _d: None,
+        is_retryable=lambda _exc: False,
+    )
+    with pytest.raises(TransientError):
+        r.get("/x")
+    assert inner.calls == 1
+
+
+# --------------------------------------------------------------------------- custom backoff
+
+
+def test_custom_backoff_overrides_default_schedule():
+    inner = FlakyBackend(fail_times=10)
+    sleep = CapturingSleep()
+    # Fixed 100ms delay, ignores base_delay/max_delay/jitter.
+    r = RetryingBackend(
+        inner,
+        max_attempts=4,
+        base_delay=999.0,  # would dominate the default schedule
+        max_delay=999.0,
+        jitter=True,
+        sleep=sleep,
+        backoff=lambda _attempt: 0.1,
+    )
+    with pytest.raises(TransientError):
+        r.get("/x")
+    assert sleep.delays == [0.1, 0.1, 0.1]
+
+
+def test_custom_backoff_per_attempt():
+    inner = FlakyBackend(fail_times=10)
+    sleep = CapturingSleep()
+    r = RetryingBackend(
+        inner,
+        max_attempts=4,
+        sleep=sleep,
+        backoff=lambda attempt: attempt * 0.5,  # 0.5, 1.0, 1.5
+    )
+    with pytest.raises(TransientError):
+        r.get("/x")
+    assert sleep.delays == [0.5, 1.0, 1.5]
+
+
+# --------------------------------------------------------------------------- on_retry callback
+
+
+def test_on_retry_callback_invoked_per_retry():
+    inner = FlakyBackend(fail_times=2)
+    events: list[tuple[int, type, float]] = []
+
+    def hook(attempt: int, exc: BaseException, delay: float) -> None:
+        events.append((attempt, type(exc), delay))
+
+    r = RetryingBackend(
+        inner,
+        max_attempts=5,
+        sleep=lambda _d: None,
+        rng=lambda: 1.0,
+        on_retry=hook,
+    )
+    assert r.get("/x") == "ok"
+    # Two flakes → two retries → two callback invocations.
+    assert [e[0] for e in events] == [1, 2]
+    assert all(t is TransientError for _, t, _ in events)
+
+
+def test_buggy_on_retry_does_not_break_retry_loop():
+    inner = FlakyBackend(fail_times=2)
+
+    def boom(*_a, **_kw) -> None:
+        msg = "callback exploded"
+        raise RuntimeError(msg)
+
+    r = RetryingBackend(
+        inner,
+        max_attempts=5,
+        sleep=lambda _d: None,
+        on_retry=boom,
+    )
+    # Despite callback raising, retry loop completes successfully.
+    assert r.get("/x") == "ok"
+    assert inner.calls == 3

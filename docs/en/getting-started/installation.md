@@ -66,7 +66,7 @@ For `pyright`, no extra config is required — it understands Pydantic's
 If you're contributing to vaultly itself:
 
 ```sh
-git clone https://github.com/dspiridonov/vaultly
+git clone https://github.com/cop1cat/vaultly
 cd vaultly
 uv sync --all-extras --group dev
 uv run pytest

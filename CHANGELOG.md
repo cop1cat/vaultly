@@ -79,11 +79,11 @@ First public release.
   which case the parent's validation pass covers it. If never wired,
   the first fetch surfaces a clean `MissingContextVariableError`.
 - `Backend.get(path, *, version=None)` signature is the most likely
-  candidate to evolve before 1.0 (see [Breaking-change policy](https://dspiridonov.github.io/vaultly/guides/security-model/)).
+  candidate to evolve before 1.0 (see [Breaking-change policy](https://cop1cat.github.io/vaultly/guides/security-model/)).
 - Async / `AsyncBackend` is not yet supported. Use `asyncio.to_thread`
   to bridge from coroutines until v0.2.
 
-[Unreleased]: https://github.com/dspiridonov/vaultly/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/dspiridonov/vaultly/releases/tag/v0.1.0
+[Unreleased]: https://github.com/cop1cat/vaultly/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/cop1cat/vaultly/releases/tag/v0.1.0
 
 

@@ -61,7 +61,7 @@ def test_leading_slash_stripped():
 def test_uses_configured_mount_point():
     b = _backend({"x": {"value": "v"}}, mount_point="kv")
     b.get("x")
-    assert b._client.kv.calls == [("kv", "x")]
+    assert b._user_client.kv.calls == [("kv", "x")]
 
 
 def test_default_key_is_configurable():
@@ -86,35 +86,35 @@ def test_missing_key_in_data_maps_to_secret_not_found():
 
 def test_forbidden_maps_to_auth_error():
     b = _backend({"x": {"value": "v"}})
-    b._client.kv.behavior = hvac_exc.Forbidden("denied")
+    b._user_client.kv.behavior = hvac_exc.Forbidden("denied")
     with pytest.raises(AuthError, match="denied"):
         b.get("x")
 
 
 def test_unauthorized_maps_to_auth_error():
     b = _backend({"x": {"value": "v"}})
-    b._client.kv.behavior = hvac_exc.Unauthorized("bad token")
+    b._user_client.kv.behavior = hvac_exc.Unauthorized("bad token")
     with pytest.raises(AuthError, match="invalid or expired"):
         b.get("x")
 
 
 def test_server_error_maps_to_transient():
     b = _backend({"x": {"value": "v"}})
-    b._client.kv.behavior = hvac_exc.InternalServerError("oops")
+    b._user_client.kv.behavior = hvac_exc.InternalServerError("oops")
     with pytest.raises(TransientError, match="server error"):
         b.get("x")
 
 
 def test_connection_error_maps_to_transient():
     b = _backend({"x": {"value": "v"}})
-    b._client.kv.behavior = RequestsConnectionError("connect refused")
+    b._user_client.kv.behavior = RequestsConnectionError("connect refused")
     with pytest.raises(TransientError, match="connection error"):
         b.get("x")
 
 
 def test_unknown_vault_error_maps_to_transient():
     b = _backend({"x": {"value": "v"}})
-    b._client.kv.behavior = hvac_exc.VaultError("weird")
+    b._user_client.kv.behavior = hvac_exc.VaultError("weird")
     with pytest.raises(TransientError, match="VaultError"):
         b.get("x")
 
@@ -125,7 +125,7 @@ def test_unknown_vault_error_maps_to_transient():
 def test_get_batch_uses_default_serial_implementation():
     b = _backend({"a": {"value": "1"}, "b": {"value": "2"}})
     assert b.get_batch(["a", "b"]) == {"a": "1", "b": "2"}
-    assert len(b._client.kv.calls) == 2
+    assert len(b._user_client.kv.calls) == 2
 
 
 # --------------------------------------------------------------------------- token renewal
@@ -178,3 +178,81 @@ def test_repeated_unauthorized_after_renewal_raises_auth_error():
     b = VaultBackend(client=fc, token_factory=lambda: "still-bad")
     with pytest.raises(AuthError, match="still rejects renewed token"):
         b.get("x")
+
+
+# --------------------------------------------------------------------------- connection management
+
+
+def test_reuse_connection_keeps_one_client():
+    """Default behavior: a single hvac.Client is reused across calls."""
+    b = VaultBackend(url="http://x", token="t")  # reuse_connection=True default
+    c1 = b._client()
+    c2 = b._client()
+    c3 = b._client()
+    assert c1 is c2 is c3
+
+
+def test_no_reuse_makes_fresh_client_per_call():
+    b = VaultBackend(url="http://x", token="t", reuse_connection=False)
+    c1 = b._client()
+    c2 = b._client()
+    assert c1 is not c2
+
+
+def test_idle_timeout_recreates_after_gap(monkeypatch):
+    b = VaultBackend(url="http://x", token="t", idle_timeout=1.0)
+
+    fake_now = [0.0]
+    monkeypatch.setattr(
+        "vaultly.backends.vault.time.monotonic", lambda: fake_now[0]
+    )
+
+    c1 = b._client()
+    fake_now[0] = 0.5  # within timeout
+    c2 = b._client()
+    assert c1 is c2
+
+    fake_now[0] = 1.6  # past timeout — recreate
+    c3 = b._client()
+    assert c3 is not c1
+
+
+def test_user_supplied_client_ignores_idle_timeout():
+    """When user passes their own client, we don't manage its lifecycle."""
+    user = FakeClient({"x": {"value": "v"}})
+    b = VaultBackend(client=user, idle_timeout=0.001, reuse_connection=False)
+    # Both knobs are no-ops because we never own the client.
+    c1 = b._client()
+    c2 = b._client()
+    assert c1 is c2 is user
+
+
+def test_token_factory_persists_to_new_clients_under_no_reuse(monkeypatch):
+    """With reuse_connection=False, every call recreates the client.
+    A renewed token must apply to subsequent recreations too, not only
+    to the immediate retry."""
+    constructions: list[str | None] = []
+
+    class _Probe:
+        def __init__(self, url=None, token=None, **_kw):
+            constructions.append(token)
+            self.token = token
+
+    monkeypatch.setattr("vaultly.backends.vault.hvac.Client", _Probe)
+
+    b = VaultBackend(
+        url="http://x",
+        token="initial",
+        reuse_connection=False,
+        token_factory=lambda: "rotated",
+    )
+
+    # First two reads: token is still "initial".
+    b._client()
+    b._client()
+    assert constructions == ["initial", "initial"]
+
+    # Simulate what the `get` path does on Unauthorized + token_factory.
+    b._token = "rotated"
+    b._client()
+    assert constructions[-1] == "rotated"

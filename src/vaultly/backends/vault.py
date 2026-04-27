@@ -29,6 +29,8 @@ real Vault behaves like.
 from __future__ import annotations
 
 import json
+import threading
+import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
 if TYPE_CHECKING:
@@ -60,6 +62,9 @@ class VaultBackend(Backend):
         default_key: str = "value",
         client: Any = None,
         token_factory: Callable[[], str] | None = None,
+        reuse_connection: bool = True,
+        idle_timeout: float | None = None,
+        client_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the Vault backend.
 
@@ -70,19 +75,70 @@ class VaultBackend(Backend):
             default_key: Field within the secret dict to return when the
                 path doesn't carry a `:key` suffix.
             client: Pass a pre-configured `hvac.Client` instead of letting
-                us create one.
+                us create one. When given, `reuse_connection`,
+                `idle_timeout`, and `client_kwargs` are ignored — you own
+                the client's lifecycle.
             token_factory: Optional callable invoked when the current token
                 is rejected (`Unauthorized`). Should return a fresh token;
                 we install it on the client and retry the read once.
                 Use this with short-lived tokens (AppRole, K8s auth, etc.).
+            reuse_connection: When `True` (default), one persistent
+                `hvac.Client` (and its underlying `requests.Session`) is
+                kept for the backend's lifetime. Set `False` for a fresh
+                client per call — useful when reads are infrequent and
+                idle TCP connections get dropped by an LB / proxy.
+            idle_timeout: Recreate the persistent client when the gap
+                between calls exceeds this many seconds. Compromise
+                between `reuse_connection=True` (cheap, may stale) and
+                `reuse_connection=False` (always fresh, slow). Ignored
+                if `reuse_connection=False`.
+            client_kwargs: Extra kwargs forwarded to `hvac.Client(...)`
+                (e.g. `verify=False`, custom `adapter`). Used when we
+                construct or recreate the client; ignored when `client=`
+                was passed.
         """
-        if client is not None:
-            self._client = client
-        else:
-            self._client = hvac.Client(url=url, token=token)
         self.mount_point = mount_point
         self.default_key = default_key
         self._token_factory = token_factory
+
+        # Connection management.
+        self._user_client = client
+        self._url = url
+        self._token = token
+        self._reuse = reuse_connection
+        self._idle_timeout = idle_timeout
+        self._client_kwargs = dict(client_kwargs) if client_kwargs else {}
+
+        # Set on first use; protected by `_client_lock` for thread safety.
+        self._client_lock = threading.Lock()
+        self._cached_client: Any = client  # may stay None until first call
+        self._cached_at: float | None = None
+
+    def _make_client(self) -> Any:
+        return hvac.Client(url=self._url, token=self._token, **self._client_kwargs)
+
+    def _client(self) -> Any:
+        # The user-supplied client is always returned as-is — we don't manage
+        # its lifecycle.
+        if self._user_client is not None:
+            return self._user_client
+
+        if not self._reuse:
+            # Fresh client per call. Caller pays for a new TCP connection
+            # and TLS handshake every read; useful for very-rare reads.
+            return self._make_client()
+
+        with self._client_lock:
+            now = time.monotonic()
+            stale = (
+                self._idle_timeout is not None
+                and self._cached_at is not None
+                and (now - self._cached_at) > self._idle_timeout
+            )
+            if self._cached_client is None or stale:
+                self._cached_client = self._make_client()
+            self._cached_at = now
+            return self._cached_client
 
     def get(self, path: str, *, version: int | str | None = None) -> str:
         secret_path, key = self._split(path)
@@ -95,13 +151,19 @@ class VaultBackend(Backend):
                 )
                 raise AuthError(msg) from e
             try:
-                self._client.token = self._token_factory()
+                new_token = self._token_factory()
             except Exception as factory_err:
                 msg = (
                     f"token_factory raised while renewing Vault token "
                     f"(reading {secret_path}): {factory_err}"
                 )
                 raise AuthError(msg) from factory_err
+            # Persist for any future _make_client() (relevant when
+            # reuse_connection=False) and update the live client.
+            self._token = new_token
+            current = self._cached_client if self._user_client is None else self._user_client
+            if current is not None:
+                current.token = new_token
             try:
                 resp = self._read(secret_path, version)
             except hvac_exc.Unauthorized as e2:
@@ -131,7 +193,7 @@ class VaultBackend(Backend):
         if version is not None:
             kw["version"] = int(version)
         try:
-            return self._client.secrets.kv.v2.read_secret_version(**kw)
+            return self._client().secrets.kv.v2.read_secret_version(**kw)
         except hvac_exc.InvalidPath as e:
             msg = f"Vault path not found: {secret_path}"
             raise SecretNotFoundError(msg) from e

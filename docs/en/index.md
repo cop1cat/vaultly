@@ -48,7 +48,7 @@ that to a single Pydantic model that:
 
 Pre-1.0. The public surface is stable for the documented backends; some
 internals (notably `Backend.get` signature) may evolve before 1.0. See the
-[changelog](https://github.com/dspiridonov/vaultly/blob/main/CHANGELOG.md)
+[changelog](https://github.com/cop1cat/vaultly/blob/main/CHANGELOG.md)
 and the breaking-change note at the end of this site.
 
 ## Where to start
