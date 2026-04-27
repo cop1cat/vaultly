@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-04-27
+## [1.0.0] - 2026-04-27
 
 First public release.
 
@@ -88,8 +88,9 @@ First public release.
   into a parent that supplies the missing context. If never wired, the
   first fetch raises `MissingContextVariableError`.
 - `Backend.get(path, *, version=None)` is the most likely candidate to
-  evolve before 1.0 (a `SecretQuery`-shaped argument is on the table).
+  evolve in a future major release (a `SecretQuery`-shaped argument is
+  on the table).
 - No native async API yet. Bridge from coroutines via
-  `asyncio.to_thread` until v0.2.
+  `asyncio.to_thread` for now.
 
-[0.1.0]: https://github.com/cop1cat/vaultly/releases/tag/v0.1.0
+[1.0.0]: https://github.com/cop1cat/vaultly/releases/tag/v1.0.0

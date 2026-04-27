@@ -65,7 +65,7 @@ import asyncio
 db_pw = await asyncio.to_thread(lambda: config.db_password)
 ```
 
-A native async API is on the v0.2 roadmap.
+A native async API is on the roadmap.
 
 ## Process boundaries
 

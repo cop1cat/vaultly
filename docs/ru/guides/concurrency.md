@@ -65,7 +65,7 @@ import asyncio
 db_pw = await asyncio.to_thread(lambda: config.db_password)
 ```
 
-Нативный async API запланирован на v0.2.
+Нативный async API в планах.
 
 ## Границы процессов
 

@@ -13,7 +13,7 @@ backend = VaultBackend(
 )
 ```
 
-vaultly работает с **KV v2**. KV v1 в v0.1 не поддерживается.
+vaultly работает с **KV v2**. KV v1 не поддерживается.
 
 ## Синтаксис `path:key`
 
