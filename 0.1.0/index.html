@@ -1385,11 +1385,12 @@ clients, ad-hoc caching, and <code># TODO: rotate me</code> comments. vaultly co
 that to a single Pydantic model that:</p>
 <ul>
 <li>Works with the type system you already use — <code>cfg.db_password</code> is a plain
-  <code>str</code>, <code>cfg.max_conns</code> is a real <code>int</code>. Downstream libraries (psycopg, httpx,
-  Redis clients) need no adapters.</li>
-<li>Doesn't leak — <code>repr</code>, <code>str</code>, <code>model_dump</code>, and JSON output mask every
-  secret field. <code>copy.copy</code>, <code>copy.deepcopy</code>, <code>model_copy</code>, and <code>pickle</code>
-  refuse to operate on a model that holds cached secrets.</li>
+  <code>str</code>, <code>cfg.max_conns</code> is a real <code>int</code>.</li>
+<li>Downstream libraries (psycopg, httpx, Redis clients) need no adapters.</li>
+<li>Doesn't leak in output — <code>repr</code>, <code>str</code>, <code>model_dump</code>, and JSON output mask
+  every secret field.</li>
+<li>Refuses to be cloned — <code>copy.copy</code>, <code>copy.deepcopy</code>, <code>model_copy</code>, and
+  <code>pickle</code> won't operate on a model that holds cached secrets.</li>
 <li>Is explicit about retries and TTL — no surprise behavior on a 5xx storm,
   no surprise behavior at midnight when a TTL expires.</li>
 <li>Is testable — the in-memory <code>MockBackend</code> plugs in identically to real

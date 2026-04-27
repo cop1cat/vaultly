@@ -1072,6 +1072,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connection-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1463,6 +1474,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connection-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection management
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1610,9 +1632,34 @@ expired token still produce a single renewal call.</p>
 <p>If the renewed token is also rejected, vaultly raises <code>AuthError</code>. If
 <code>token_factory</code> itself raises, that surfaces as <code>AuthError</code> with the
 factory's exception preserved as <code>__cause__</code>.</p>
+<h2 id="connection-management">Connection management<a class="headerlink" href="#connection-management" title="Permanent link">&para;</a></h2>
+<p>By default <code>VaultBackend</code> keeps a single long-lived <code>hvac.Client</code> (and
+its underlying <code>requests.Session</code>) for its entire lifetime. For
+frequently-reading services this is the right call — the TLS handshake
+amortizes across reads.</p>
+<p>For <strong>infrequent reads</strong> (once per hour) an idle TCP connection through
+an NLB / ELB / proxy may get dropped. The first request after the gap
+then fails with a network error (vaultly surfaces it as <code>TransientError</code>,
+so the retry layer recovers — but it's noise). Two ways to avoid that:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Option 1: recreate the client when the gap between calls exceeds 5 min.</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">VaultBackend</span><span class="p">(</span><span class="n">url</span><span class="o">=...</span><span class="p">,</span> <span class="n">token</span><span class="o">=...</span><span class="p">,</span> <span class="n">idle_timeout</span><span class="o">=</span><span class="mf">300.0</span><span class="p">)</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Option 2: a fresh client per call. Costlier per-read latency, but</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># never trips on a dead socket.</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">VaultBackend</span><span class="p">(</span><span class="n">url</span><span class="o">=...</span><span class="p">,</span> <span class="n">token</span><span class="o">=...</span><span class="p">,</span> <span class="n">reuse_connection</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+<p>Extra kwargs can be forwarded to the hvac client via <code>client_kwargs=</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">VaultBackend</span><span class="p">(</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://vault.example.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">token</span><span class="o">=</span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">client_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;verify&quot;</span><span class="p">:</span> <span class="s2">&quot;/etc/ca/vault-ca.pem&quot;</span><span class="p">},</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">)</span>
+</code></pre></div>
+<p>If you pass your own <code>client=...</code>, these three knobs are ignored — you
+own the client's lifecycle.</p>
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <p>KV v2 stores every write as a new version. Pin a specific one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">pinned</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Secret</span><span class="p">(</span><span class="s2">&quot;/myapp/api_key&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">pinned</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Secret</span><span class="p">(</span><span class="s2">&quot;/myapp/api_key&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
 <p>vaultly forwards <code>version=2</code> to hvac's <code>read_secret_version(version=...)</code>.</p>
 <h2 id="error-mapping">Error mapping<a class="headerlink" href="#error-mapping" title="Permanent link">&para;</a></h2>
@@ -1651,34 +1698,34 @@ factory's exception preserved as <code>__cause__</code>.</p>
 </tbody>
 </table>
 <h2 id="combining-with-retries">Combining with retries<a class="headerlink" href="#combining-with-retries" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vaultly</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryingBackend</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vaultly.backends.vault</span><span class="w"> </span><span class="kn">import</span> <span class="n">VaultBackend</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">RetryingBackend</span><span class="p">(</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">VaultBackend</span><span class="p">(</span><span class="n">url</span><span class="o">=...</span><span class="p">,</span> <span class="n">token</span><span class="o">=...</span><span class="p">,</span> <span class="n">token_factory</span><span class="o">=</span><span class="n">renew</span><span class="p">),</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">max_attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">total_timeout</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vaultly</span><span class="w"> </span><span class="kn">import</span> <span class="n">RetryingBackend</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">vaultly.backends.vault</span><span class="w"> </span><span class="kn">import</span> <span class="n">VaultBackend</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">RetryingBackend</span><span class="p">(</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">VaultBackend</span><span class="p">(</span><span class="n">url</span><span class="o">=...</span><span class="p">,</span> <span class="n">token</span><span class="o">=...</span><span class="p">,</span> <span class="n">token_factory</span><span class="o">=</span><span class="n">renew</span><span class="p">),</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">max_attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">total_timeout</span><span class="o">=</span><span class="mf">10.0</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="p">)</span>
 </code></pre></div>
 <p>Token renewal happens <strong>inside</strong> <code>VaultBackend</code>, before <code>TransientError</code>
 ever reaches the retry layer. So <code>RetryingBackend</code> only retries actual
 backend flakes, not auth issues.</p>
 <h2 id="recipe-k8s-service-account-auth">Recipe: K8s service-account auth<a class="headerlink" href="#recipe-k8s-service-account-auth" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">hvac</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">k8s_login</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">jwt</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/var/run/secrets/kubernetes.io/serviceaccount/token&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="n">client</span> <span class="o">=</span> <span class="n">hvac</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://vault.example.com&quot;</span><span class="p">)</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">resp</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">auth</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;my-app&quot;</span><span class="p">,</span> <span class="n">jwt</span><span class="o">=</span><span class="n">jwt</span><span class="p">)</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="k">return</span> <span class="n">resp</span><span class="p">[</span><span class="s2">&quot;auth&quot;</span><span class="p">][</span><span class="s2">&quot;client_token&quot;</span><span class="p">]</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">VaultBackend</span><span class="p">(</span>
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://vault.example.com&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="n">token</span><span class="o">=</span><span class="n">k8s_login</span><span class="p">(),</span>       <span class="c1"># initial login at boot</span>
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="n">token_factory</span><span class="o">=</span><span class="n">k8s_login</span><span class="p">,</span> <span class="c1"># re-login on Unauthorized</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">hvac</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">k8s_login</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">jwt</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/var/run/secrets/kubernetes.io/serviceaccount/token&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">client</span> <span class="o">=</span> <span class="n">hvac</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://vault.example.com&quot;</span><span class="p">)</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="n">resp</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">auth</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">role</span><span class="o">=</span><span class="s2">&quot;my-app&quot;</span><span class="p">,</span> <span class="n">jwt</span><span class="o">=</span><span class="n">jwt</span><span class="p">)</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="k">return</span> <span class="n">resp</span><span class="p">[</span><span class="s2">&quot;auth&quot;</span><span class="p">][</span><span class="s2">&quot;client_token&quot;</span><span class="p">]</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="n">backend</span> <span class="o">=</span> <span class="n">VaultBackend</span><span class="p">(</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://vault.example.com&quot;</span><span class="p">,</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="n">token</span><span class="o">=</span><span class="n">k8s_login</span><span class="p">(),</span>       <span class="c1"># initial login at boot</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>    <span class="n">token_factory</span><span class="o">=</span><span class="n">k8s_login</span><span class="p">,</span> <span class="c1"># re-login on Unauthorized</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="p">)</span>
 </code></pre></div>
 
 

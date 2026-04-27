@@ -1459,9 +1459,9 @@ same secret simultaneously produce <strong>exactly one</strong> backend call.</p
 </ul>
 <h2 id="hot-path-performance">Hot-path performance<a class="headerlink" href="#hot-path-performance" title="Permanent link">&para;</a></h2>
 <p>Cache <strong>hits</strong> take only the lightweight cache lock, not the per-key
-lock. They scale across threads. The integration test
-<code>test_warm_cache_hot_reads_dont_serialize</code> confirms 200,000 reads across
-20 threads complete well under a second.</p>
+lock, so they scale across threads — the integration test
+<code>test_warm_cache_hot_reads_dont_serialize</code> runs 200,000 reads across
+20 threads in under a second.</p>
 <p>A regression that ever serializes hot reads — say, by always taking the
 per-key lock — would balloon that number 100×.</p>
 <h2 id="asyncio">Asyncio<a class="headerlink" href="#asyncio" title="Permanent link">&para;</a></h2>
