@@ -4,10 +4,7 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [0.1.0]
-<!-- Set the date when cutting the tag. Format: YYYY-MM-DD -->
+## [0.1.0] - 2026-04-27
 
 First public release.
 
@@ -95,5 +92,4 @@ First public release.
 - No native async API yet. Bridge from coroutines via
   `asyncio.to_thread` until v0.2.
 
-[Unreleased]: https://github.com/cop1cat/vaultly/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/cop1cat/vaultly/releases/tag/v0.1.0
