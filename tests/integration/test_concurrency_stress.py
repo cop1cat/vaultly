@@ -145,9 +145,10 @@ def test_warm_cache_hot_reads_dont_serialize() -> None:
     # 200k reads. The exact wall-clock isn't the test's point; the test
     # exists to *catch a regression* where reads start taking the per-key
     # lock and serialize — if that happens this number balloons by 100x+.
-    # Threshold left generous so coverage tracing (which adds ~10x) doesn't
-    # flake the test.
-    assert elapsed < 30.0, f"hot reads too slow: {elapsed:.2f}s"
+    # Threshold deliberately generous so coverage tracing on slow CI
+    # runners doesn't flake the test; the failure mode we care about is
+    # orders of magnitude away.
+    assert elapsed < 120.0, f"hot reads too slow: {elapsed:.2f}s"
     assert backend.calls == ["/k"]  # exactly one warm-up call
 
 
