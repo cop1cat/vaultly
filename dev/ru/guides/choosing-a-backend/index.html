@@ -1506,11 +1506,13 @@ batched чтение, версии.</p>
 <code>max_attempts</code> позволял бы больше, vaultly остановит ретраи когда
 бюджет исчерпан. Это не даёт 30-минутному outage'у превратиться в
 30-минутный hang при старте.</p>
-<p>Если нужна логика отличающаяся от дефолта — есть три callback'а:
-<code>is_retryable=</code> (что считать ретраеспособным), <code>backoff=</code> (своя формула
-задержки), <code>on_retry=</code> (callback на каждое событие, для метрик и
-breadcrumbs). Подробности — в <a href="../retries-and-stale/">Ретраи и
-stale-on-error</a>.</p>
+<p>Если нужна логика отличающаяся от дефолта — есть три callback'а:</p>
+<ul>
+<li><code>is_retryable=</code> — что считать ретраеспособным.</li>
+<li><code>backoff=</code> — своя формула задержки.</li>
+<li><code>on_retry=</code> — callback на каждое событие; для метрик и breadcrumbs.</li>
+</ul>
+<p>Подробности — в <a href="../retries-and-stale/">Ретраи и stale-on-error</a>.</p>
 
 
 
