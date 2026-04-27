@@ -13,7 +13,7 @@ backend = VaultBackend(
 )
 ```
 
-vaultly speaks **KV v2**. KV v1 is not supported in v0.1.
+vaultly speaks **KV v2**. KV v1 is not supported.
 
 ## `path:key` syntax
 

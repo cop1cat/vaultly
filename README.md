@@ -233,8 +233,9 @@ What vaultly **does not** mask:
   for the same uncached secret produce exactly one backend call.
 - Hot-path reads (cache hit) take only the cache lock and return without
   touching the per-key fetch lock.
-- Async is not yet supported (planned for v0.2). Today, fetches inside an
-  event loop will block; wrap calls in `asyncio.to_thread` if needed.
+- Async is not yet supported (planned for a future release). Today,
+  fetches inside an event loop will block; wrap calls in
+  `asyncio.to_thread` if needed.
 
 ## Construction paths
 
@@ -249,9 +250,10 @@ a Pydantic `model_validator(mode='after')`, which fires for both:
 You'll get an instance back, but path checks and prefetch don't run; the
 first attribute access surfaces any errors lazily.
 
-## Breaking-change policy (pre-1.0)
+## Stability
 
-Before 1.0, the public API may change between minor versions. The
-`Backend.get(path, *, version=None)` signature in particular is a candidate
-for revision (a future `SecretQuery`-shaped argument is on the table).
-Pin the patch version in production until 1.0.
+vaultly follows [Semantic Versioning](https://semver.org/). Breaking
+changes to the public API ship in a major version bump. The
+`Backend.get(path, *, version=None)` signature is the most likely
+candidate to evolve in a future major release (a `SecretQuery`-shaped
+argument is on the table).
