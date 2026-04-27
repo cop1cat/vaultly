@@ -3,25 +3,25 @@
 Дерево решений:
 
 ```text
-┌─ Это unit/integration-тест?
-│  └─ MockBackend  (in-memory dict, трекает вызовы)
+┌─ unit / integration тест?
+│  └─ MockBackend  (in-memory dict, ведёт журнал вызовов)
 │
-├─ Локальная разработка / простой контейнерный деплой / CI?
-│  └─ EnvBackend   (env vars, опциональный prefix)
+├─ локальная разработка / простой контейнерный деплой / CI?
+│  └─ EnvBackend   (env vars, опциональный префикс)
 │
-├─ Работа на AWS, секреты в SSM Parameter Store?
-│  └─ AWSSSMBackend  (скорее всего обёрнутый в RetryingBackend)
+├─ сервис на AWS, секреты в SSM Parameter Store?
+│  └─ AWSSSMBackend  (как правило в обёртке RetryingBackend)
 │
-├─ HashiCorp Vault для всего?
-│  └─ VaultBackend (скорее всего обёрнутый в RetryingBackend, с token_factory)
+├─ инфра на Vault?
+│  └─ VaultBackend (в обёртке RetryingBackend, с token_factory)
 │
-└─ Что-то ещё (Azure KV, GCP SM, кастом)?
-   └─ Подкласс Backend, ~30 строк (см. концепцию Backends)
+└─ что-то ещё (Azure KV, GCP SM, своё)?
+   └─ Подкласс Backend, ~30 строк (см. концепцию Бэкендов)
 ```
 
 ## EnvBackend
 
-Самый низкофрикционный вариант. Маппит `/db/prod/password` →
+Самый дешёвый вариант. Отображает `/db/prod/password` →
 `DB_PROD_PASSWORD`.
 
 ```python
@@ -35,14 +35,14 @@ backend = EnvBackend(prefix="MYAPP_")   # MYAPP_DB_PROD_PASSWORD (auto-de-dup)
 Между префиксом и ключом автоматически вставляется одно подчёркивание,
 если префикс не оканчивается на `_`.
 
-**Не используйте** для production-grade секретов. Env vars видны любому,
-у кого есть доступ к `/proc/<pid>/environ`; для реальных секретов
-используйте выделенный secret store.
+**Не подходит** для production-секретов: env vars видны любому, у кого
+есть доступ к `/proc/<pid>/environ`. Для серьёзных секретов используйте
+выделенное хранилище.
 
 ## MockBackend
 
-Для тестов. Конструируется с dict path → value. Трекает каждый вызов,
-чтобы можно было проверять поведение кэша.
+Для тестов. На вход — dict path → value. Ведёт журнал вызовов, чтобы
+можно было проверять поведение кэша.
 
 ```python
 from vaultly import MockBackend
@@ -53,15 +53,14 @@ config.db_password         # "s3cr3t"
 b.calls                    # [("/db/password", None)]
 ```
 
-Для версионированных секретов передайте отдельный `versions=`:
+Для версионированных секретов — отдельный `versions=`:
 
 ```python
 b = MockBackend(versions={("/db/password", 2): "older"})
 ```
 
-`MockBackend` поднимает `SecretNotFoundError` для отсутствующих ключей,
-совпадая с контрактом реальных бэкендов — error-path тесты работают
-одинаково.
+`MockBackend` поднимает `SecretNotFoundError` для отсутствующих ключей —
+так же, как и реальные бэкенды. Тесты на error-path работают одинаково.
 
 ## AWSSSMBackend
 
@@ -72,7 +71,7 @@ backend = AWSSSMBackend(region_name="eu-west-1")
 ```
 
 По умолчанию использует разумные production-таймауты (2с connect / 5с
-read) и adaptive-ретраи. Передайте `config=` для переопределения:
+read) и adaptive-ретраи. Для override передайте `config=`:
 
 ```python
 from botocore.config import Config
@@ -87,8 +86,8 @@ backend = AWSSSMBackend(
 )
 ```
 
-См. [Гайд по AWS SSM](aws-ssm.md) для полной матрицы фич (SecureString,
-batch, версии).
+См. [Гайд по AWS SSM](aws-ssm.md) для полной матрицы фич: SecureString,
+batched чтение, версии.
 
 ## VaultBackend
 
@@ -103,17 +102,18 @@ backend = VaultBackend(
 )
 ```
 
-Для короткоживущих токенов (AppRole, K8s auth, JWT) передайте
-`token_factory=` callable, возвращающий свежий токен. vaultly вызывает
-его один раз на `Unauthorized` и повторяет чтение.
+Для коротких токенов (AppRole, K8s auth, JWT) передайте `token_factory=`
+— callable, возвращающий свежий токен. vaultly вызовет его на
+`Unauthorized` и повторит чтение.
 
-См. [Гайд по Vault](vault.md) для синтаксиса `path:key`, специфики KV v2
-и паттернов обновления токенов.
+См. [Гайд по Vault](vault.md): синтаксис `path:key`, специфика KV v2,
+паттерны обновления токенов, управление соединением.
 
 ## RetryingBackend
 
-Оборачивает любой другой бэкенд. Ретраит только `TransientError`
-(таймауты, throttling, 5xx). Auth и not-found не ретраятся.
+Оборачивает любой другой бэкенд. По умолчанию ретраит только
+`TransientError` (таймауты, throttling, 5xx). Auth и not-found не
+ретраятся.
 
 ```python
 from vaultly import RetryingBackend
@@ -128,10 +128,13 @@ backend = RetryingBackend(
 )
 ```
 
-`total_timeout` — жёсткий wall-clock бюджет. Даже если `max_attempts`
-позволяло бы больше, vaultly остановит ретраи по бюджету. Это
-предотвращает превращение 30-минутного outage в 30-минутный hang при
-старте.
+`total_timeout` — жёсткий бюджет по wall-clock'у. Даже если
+`max_attempts` позволял бы больше, vaultly остановит ретраи когда
+бюджет исчерпан. Это не даёт 30-минутному outage'у превратиться в
+30-минутный hang при старте.
 
-См. [Ретраи и stale-on-error](retries-and-stale.md) о взаимодействии
-ретраев, TTL и опции `stale_on_error` модели.
+Если нужна логика отличающаяся от дефолта — есть три callback'а:
+`is_retryable=` (что считать ретраеспособным), `backoff=` (своя формула
+задержки), `on_retry=` (callback на каждое событие, для метрик и
+breadcrumbs). Подробности — в [Ретраи и
+stale-on-error](retries-and-stale.md).

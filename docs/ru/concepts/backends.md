@@ -1,9 +1,9 @@
 # Бэкенды
 
-Бэкенд — это то, что реально достаёт секрет. vaultly содержит несколько
-встроенных и позволяет писать свои.
+Бэкенд — это то, что реально достаёт секрет из хранилища. В vaultly
+есть несколько готовых, и вы можете написать свой.
 
-## Абстрактный базовый класс `Backend`
+## Базовый класс `Backend`
 
 ```python
 from abc import ABC, abstractmethod
@@ -15,59 +15,60 @@ class Backend(ABC):
         """Вернуть сырую строку по `path` или поднять ошибку vaultly."""
 
     def get_batch(self, paths: list[str]) -> dict[str, str]:
-        """Прочитать много путей за раз. По умолчанию: серия `get`. Дедуп входов."""
+        """Прочитать много путей за раз. По умолчанию — серия `get`. Дедуп входов."""
 ```
 
-Два метода, оба возвращают строки. `SecretModel` сам кастует строки в
-тип, объявленный для поля. Бэкенды НЕ занимаются преобразованием типов.
+Два метода, оба возвращают строки. `SecretModel` сам приведёт строки к
+типу поля. Бэкенды НЕ занимаются приведением типов.
 
-`get_batch` использует `prefetch()`. Дефолтная реализация делает серию
-последовательных `get`. Бэкенды с реальным batch API (SSM
-`GetParameters`, Vault list, …) переопределяют его для эффективности.
+`get_batch` использует `prefetch()`. По умолчанию вызывает `get` в
+цикле; бэкенды с реальным batch-API (SSM `GetParameters`, Vault list,
+…) переопределяют его для эффективности.
 
 ## Встроенные бэкенды
 
-| Бэкенд            | Источник / SDK   | Use case                                        |
+| Бэкенд            | Источник         | Когда использовать                              |
 | ----------------- | ---------------- | ----------------------------------------------- |
-| `EnvBackend`      | `os.environ`     | Локальная разработка, простые деплои, контейнеры. |
-| `MockBackend`     | in-memory dict   | Тесты. Трекает вызовы для ассертов.             |
+| `EnvBackend`      | `os.environ`     | Локальная разработка, простые деплои.           |
+| `MockBackend`     | in-memory dict   | Тесты. Ведёт журнал вызовов.                    |
 | `AWSSSMBackend`   | `boto3` SSM      | AWS Systems Manager Parameter Store.            |
 | `VaultBackend`    | `hvac` KV v2     | HashiCorp Vault.                                |
 | `RetryingBackend` | оборачивает любой | Экспоненциальные ретраи на `TransientError`.   |
 
-Облачные бэкенды требуют опциональных установок: `pip install
+Облачные бэкенды требуют отдельную установку: `pip install
 'vaultly[aws]'` или `pip install 'vaultly[vault]'`.
 
-## Выбор
+## Какой выбрать
 
-Дерево решений — в [Выбор бэкенда](../guides/choosing-a-backend.md).
+Дерево решений — в [Выборе бэкенда](../guides/choosing-a-backend.md).
 Кратко:
 
 - **Локальная разработка** → `EnvBackend`
 - **Тесты** → `MockBackend`
-- **AWS-сервис** → `AWSSSMBackend` (скорее всего обёрнутый в
+- **Сервис на AWS** → `AWSSSMBackend` (как правило, в обёртке
   `RetryingBackend`)
-- **Шоп на Vault** → `VaultBackend(token_factory=...)` (скорее всего
-  обёрнутый в `RetryingBackend`)
+- **Vault-ориентированная инфра** → `VaultBackend(token_factory=...)`
+  (тоже в обёртке `RetryingBackend`)
 
 ## Ошибки
 
-Каждый встроенный бэкенд маппит свои SDK-исключения в одно из:
+Каждый встроенный бэкенд приводит свои SDK-ошибки к одному из:
 
 - `SecretNotFoundError` — ключ/путь не существует. Не ретраится.
-- `AuthError` — невалидные credentials. Не ретраится.
-- `TransientError` — таймаут, throttling, 5xx. Ретраится `RetryingBackend`.
+- `AuthError` — невалидные учётные данные. Не ретраится.
+- `TransientError` — таймаут, throttling, 5xx. Ретраится
+  `RetryingBackend`.
 
-Ваш кастомный бэкенд должен следовать той же конвенции. Код в hot-path
-сервиса ловит `vaultly.VaultlyError` (umbrella) и более специфичные
+Свой бэкенд должен следовать тому же контракту. Прикладной код в
+hot-path ловит `vaultly.VaultlyError` (общая база) и более узкие
 подклассы по необходимости.
 
-Полная иерархия — в [Ошибки](errors.md).
+Полная иерархия — в [Ошибках](errors.md).
 
 ## Свой бэкенд
 
-Наследуйте `Backend` и реализуйте `get`. Переопределите `get_batch`,
-если у вас есть реальный bulk-fetch API.
+Наследуйтесь от `Backend` и реализуйте `get`. Переопределите
+`get_batch`, если у вашего хранилища есть реальный bulk-fetch API.
 
 ```python
 from vaultly import Backend
@@ -89,10 +90,10 @@ class MyBackend(Backend):
             raise TransientError(f"transient: {path}: {e}") from e
 ```
 
-Затем подключаете к `SecretModel` как любой встроенный:
+Подключаете его к `SecretModel` так же, как любой встроенный:
 
 ```python
 config = AppConfig(stage="prod", backend=MyBackend(client))
 ```
 
-Кэширование, ретраи, маскирование vaultly применяются прозрачно.
+Кэширование, ретраи и маскирование от vaultly работают прозрачно.

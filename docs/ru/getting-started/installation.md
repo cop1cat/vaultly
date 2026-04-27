@@ -1,6 +1,6 @@
 # Установка
 
-vaultly требует **Python 3.12+** и **Pydantic 2.6+**.
+Требуется **Python 3.12+** и **Pydantic 2.6+**.
 
 ## Базовая установка
 
@@ -8,14 +8,14 @@ vaultly требует **Python 3.12+** и **Pydantic 2.6+**.
 pip install vaultly
 ```
 
-Базовая установка содержит `EnvBackend` (переменные окружения),
+В базовой установке есть `EnvBackend` (переменные окружения),
 `MockBackend` (для тестов) и `RetryingBackend` (обёртка с ретраями).
-Никаких зависимостей от облачных SDK.
+SDK конкретных провайдеров не подтягиваются.
 
 ## С облачными бэкендами
 
-Бэкенды, которые работают с внешними сервисами, лежат за extras —
-`pip install vaultly` не тянет boto3 / hvac, пока они вам не нужны.
+Бэкенды для внешних сервисов вынесены в extras, чтобы `pip install
+vaultly` не тянул boto3 / hvac, если они не нужны.
 
 === "AWS SSM Parameter Store"
 
@@ -47,10 +47,10 @@ pip install vaultly
     pip install 'vaultly[aws,vault]'
     ```
 
-## С проверкой типов
+## Проверка типов
 
-vaultly содержит маркер `py.typed`, поэтому `mypy` и `pyright`
-автоматически подхватывают встроенные аннотации.
+В пакете лежит маркер `py.typed`, поэтому `mypy` и `pyright`
+автоматически читают встроенные аннотации.
 
 Для `mypy` включите Pydantic-плагин в `pyproject.toml`:
 
@@ -59,12 +59,12 @@ vaultly содержит маркер `py.typed`, поэтому `mypy` и `pyri
 plugins = ["pydantic.mypy"]
 ```
 
-Для `pyright` дополнительная настройка не нужна — он понимает Pydantic
+Для `pyright` ничего настраивать не нужно — он понимает Pydantic
 `@dataclass_transform` нативно.
 
-## Dev-установка
+## Установка для разработки
 
-Если вы контрибьютите в саму vaultly:
+Если контрибьютите в саму vaultly:
 
 ```sh
 git clone https://github.com/cop1cat/vaultly

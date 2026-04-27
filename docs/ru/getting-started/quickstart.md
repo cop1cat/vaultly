@@ -1,11 +1,11 @@
 # Быстрый старт
 
-Пять минут — и рабочий конфиг.
+Пять минут до рабочего конфига.
 
 ## 1. Объявите модель
 
-`SecretModel` — это Pydantic `BaseModel` плюс декларация полей через
-`Secret(...)`. Скалярные поля и секреты можно свободно мешать:
+`SecretModel` — это `BaseModel` от Pydantic с поддержкой полей через
+`Secret(...)`. Скаляры и секреты можно мешать в одной модели:
 
 ```python
 from vaultly import Secret, SecretModel
@@ -19,27 +19,27 @@ class AppConfig(SecretModel):
     max_conns: int = Secret("/db/{stage}/max_conns")
 ```
 
-Несколько моментов:
+Что здесь важно:
 
-- `db_password: str` — это **тот тип, с которым вы будете работать**.
-  `cfg.db_password` — обычный `str`, не `SecretStr`-обёртка.
+- `db_password: str` — это **тип, с которым вы будете работать**.
+  `cfg.db_password` — обычный `str`, не `SecretStr` или прокси.
 - `Secret("/db/{stage}/password")` — путь может ссылаться на любое
-  *не-секретное* поле **корневой** модели (тут `{stage}`).
-- `ttl=300` — кэшировать значение 5 минут. По умолчанию — «навсегда».
-- `max_conns: int` — vaultly сам кастует строку из бэкенда в `int`.
+  не-секретное поле **корневой** модели (здесь это `{stage}`).
+- `ttl=300` — кэшировать значение 5 минут. По умолчанию — навсегда.
+- `max_conns: int` — vaultly сам приведёт строку из бэкенда к `int`.
 
 ## 2. Выберите бэкенд
 
-Для локальной разработки проще всего env vars:
+Локально проще всего через переменные окружения:
 
 ```python
 from vaultly import EnvBackend
 ```
 
-`EnvBackend` маппит `/db/prod/password` → `DB_PROD_PASSWORD`. (Правила
-префиксов — в [гайде по выбору бэкенда](../guides/choosing-a-backend.md).)
+`EnvBackend` отображает `/db/prod/password` → `DB_PROD_PASSWORD`. Правила
+префиксов — в [гайде по выбору бэкенда](../guides/choosing-a-backend.md).
 
-Для тестов используйте in-memory `MockBackend`:
+Для тестов есть in-memory `MockBackend`:
 
 ```python
 from vaultly import MockBackend
@@ -53,7 +53,7 @@ backend = MockBackend(
 )
 ```
 
-Для реальных облачных бэкендов:
+Для облачных бэкендов:
 
 ```python
 from vaultly.backends.aws_ssm import AWSSSMBackend
@@ -69,22 +69,23 @@ vault = VaultBackend(url="https://vault.example.com", token=os.environ["VAULT_TO
 config = AppConfig(stage="prod", debug=True, backend=backend)
 ```
 
-Валидация путей выполняется при конструировании. Если `Secret("/{stage}/x")`
-ссылается на имя поля, которого нет в модели, вы получите чёткий
-`MissingContextVariableError` сразу — без сюрприза при первом фетче.
+Валидация путей запускается прямо в конструкторе. Если
+`Secret("/{stage}/x")` ссылается на поле, которого нет в модели,
+получите `MissingContextVariableError` сразу — а не при первом фетче в
+проде.
 
 ## 4. Используйте
 
 ```python
 config.db_password   # "s3cr3t" — фетч из бэкенда, кэш на 300с
 config.api_key       # "sk-abc"
-config.max_conns     # 20 — скастовано в int
-config.stage         # "prod" — не секрет, без обращения к бэкенду
+config.max_conns     # 20 — приведено к int
+config.stage         # "prod" — обычное поле, без обращения к бэкенду
 ```
 
-Повторные чтения попадают в кэш; последующие вызовы не идут в бэкенд.
+Повторные чтения отдаются из кэша; в бэкенд никто не ходит.
 
-## 5. Маскирование в логах / дампах
+## 5. Маскирование в логах и дампах
 
 ```python
 print(config)
@@ -99,37 +100,37 @@ config.model_dump_json()
 # > {"stage": "prod", ..., "db_password": "***", ...}
 ```
 
-!!! warning "Прямой доступ к атрибутам НЕ маскирует"
-    `print(config.db_password)` напечатает реальное значение. Для лог-вывода
-    используйте `model_dump`-сериализацию. Полная картина — в [гайде про
-    модель безопасности](../guides/security-model.md).
+!!! warning "Прямое обращение к атрибуту НЕ маскируется"
+    `print(config.db_password)` напечатает реальное значение. Для
+    логов используйте `model_dump`-сериализацию. Подробнее — в
+    [гайде по модели безопасности](../guides/security-model.md).
 
-## 6. Refresh после ротации
+## 6. Обновление после ротации
 
 ```python
-# Оператор ротировал пароль во внешнем хранилище.
-config.refresh("db_password")    # инвалидировать + перефетч одного поля
-config.refresh_all()              # инвалидировать весь кэш
+# Кто-то ротировал пароль во внешнем хранилище.
+config.refresh("db_password")    # инвалидировать одно поле и перечитать
+config.refresh_all()             # очистить весь кэш
 ```
 
-## 7. Опционально: prefetch при старте
+## 7. Опционально: предзагрузка на старте
 
-Закрепите ошибки на момент старта, чтобы не обнаружить misconfigured-
-секрет через три часа после деплоя:
+Если хотите, чтобы ошибка конфигурации валила деплой сразу, а не
+всплывала через три часа:
 
 ```python
 class AppConfig(SecretModel, validate="fetch"):
     ...
 
-# Конструктор теперь блокируется до фетча всех секретов. Любая ошибка
-# бэкенда всплывёт сразу.
+# Конструктор теперь блокируется до фетча всех секретов; любая ошибка
+# бэкенда поднимется здесь.
 config = AppConfig(stage="prod", backend=backend)
 ```
 
 ## Дальше
 
-- [Концепции SecretModel](../concepts/secret-model.md) — полный жизненный
-  цикл от объявления до фетча.
+- [SecretModel](../concepts/secret-model.md) — полный жизненный цикл от
+  объявления до фетча.
 - [Интерполяция путей](../concepts/path-interpolation.md) — как
   резолвится `{var}`, в том числе во вложенных моделях.
-- [Выбор бэкенда](../guides/choosing-a-backend.md) — что использовать когда.
+- [Выбор бэкенда](../guides/choosing-a-backend.md) — что использовать.
