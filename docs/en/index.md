@@ -34,11 +34,12 @@ clients, ad-hoc caching, and `# TODO: rotate me` comments. vaultly compresses
 that to a single Pydantic model that:
 
 - Works with the type system you already use — `cfg.db_password` is a plain
-  `str`, `cfg.max_conns` is a real `int`. Downstream libraries (psycopg, httpx,
-  Redis clients) need no adapters.
-- Doesn't leak — `repr`, `str`, `model_dump`, and JSON output mask every
-  secret field. `copy.copy`, `copy.deepcopy`, `model_copy`, and `pickle`
-  refuse to operate on a model that holds cached secrets.
+  `str`, `cfg.max_conns` is a real `int`.
+- Downstream libraries (psycopg, httpx, Redis clients) need no adapters.
+- Doesn't leak in output — `repr`, `str`, `model_dump`, and JSON output mask
+  every secret field.
+- Refuses to be cloned — `copy.copy`, `copy.deepcopy`, `model_copy`, and
+  `pickle` won't operate on a model that holds cached secrets.
 - Is explicit about retries and TTL — no surprise behavior on a 5xx storm,
   no surprise behavior at midnight when a TTL expires.
 - Is testable — the in-memory `MockBackend` plugs in identically to real

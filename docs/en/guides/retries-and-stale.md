@@ -43,6 +43,67 @@ caps total wall time including sleeps. The shorter one wins.
 For a backend with 5s read timeout, `max_attempts=5` could spend 25s+
 just on reads; `total_timeout=10` keeps the worst case bounded regardless.
 
+## Custom retry logic
+
+When the defaults don't fit, three callbacks let you tune behavior.
+
+### `is_retryable` — what counts as retryable
+
+```python
+from vaultly import SecretNotFoundError, TransientError
+
+def my_predicate(exc: BaseException) -> bool:
+    # Eventually-consistent backend: a just-written secret may not be
+    # visible yet. Let the retry layer try again.
+    return isinstance(exc, (TransientError, SecretNotFoundError))
+
+
+backend = RetryingBackend(inner, is_retryable=my_predicate)
+```
+
+By default, only `TransientError` is retried. A custom predicate can
+broaden the set (as above) or narrow it — e.g. retry nothing so every
+error surfaces immediately.
+
+### `backoff` — your own delay formula
+
+```python
+# Fixed delay between attempts.
+backend = RetryingBackend(inner, backoff=lambda _attempt: 1.0)
+
+# Decorrelated jitter, AWS Architecture Blog style.
+import random
+def decorrelated(attempt: int) -> float:
+    prev = getattr(decorrelated, "_prev", 0.5)
+    nxt = min(20.0, random.uniform(0.5, prev * 3))
+    decorrelated._prev = nxt
+    return nxt
+
+backend = RetryingBackend(inner, backoff=decorrelated)
+```
+
+When `backoff=` is set, the default `base_delay` / `max_delay` /
+`jitter` formula is bypassed.
+
+### `on_retry` — hook for metrics and breadcrumbs
+
+```python
+from prometheus_client import Counter
+RETRIES = Counter("vaultly_retries_total", "...", ["path"])
+
+def hook(attempt, exc, delay):
+    RETRIES.labels(path=str(exc)).inc()
+    sentry_sdk.add_breadcrumb(
+        category="vaultly", message=f"retry {attempt}: {exc}",
+    )
+
+backend = RetryingBackend(inner, on_retry=hook)
+```
+
+The callback fires **before** each sleep. If it raises, vaultly logs
+the exception and continues retrying — the hook must be cheap and
+non-critical.
+
 ## stale_on_error
 
 ```python

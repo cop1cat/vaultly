@@ -38,9 +38,9 @@ What's **not** protected:
 ## Hot-path performance
 
 Cache **hits** take only the lightweight cache lock, not the per-key
-lock. They scale across threads. The integration test
-`test_warm_cache_hot_reads_dont_serialize` confirms 200,000 reads across
-20 threads complete well under a second.
+lock, so they scale across threads — the integration test
+`test_warm_cache_hot_reads_dont_serialize` runs 200,000 reads across
+20 threads in under a second.
 
 A regression that ever serializes hot reads — say, by always taking the
 per-key lock — would balloon that number 100×.

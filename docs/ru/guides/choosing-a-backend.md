@@ -134,7 +134,9 @@ backend = RetryingBackend(
 30-минутный hang при старте.
 
 Если нужна логика отличающаяся от дефолта — есть три callback'а:
-`is_retryable=` (что считать ретраеспособным), `backoff=` (своя формула
-задержки), `on_retry=` (callback на каждое событие, для метрик и
-breadcrumbs). Подробности — в [Ретраи и
-stale-on-error](retries-and-stale.md).
+
+- `is_retryable=` — что считать ретраеспособным.
+- `backoff=` — своя формула задержки.
+- `on_retry=` — callback на каждое событие; для метрик и breadcrumbs.
+
+Подробности — в [Ретраи и stale-on-error](retries-and-stale.md).
