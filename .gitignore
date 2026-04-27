@@ -220,3 +220,6 @@ __marimo__/
 # Claude
 CLAUDE.md
 spike.py
+
+# mkdocs build output
+site/
