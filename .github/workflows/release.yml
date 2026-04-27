@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # PyPI Trusted Publishing
 
 jobs:
   test:
@@ -51,7 +50,10 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi  # configure trusted publisher in PyPI for this env
+    # Optional: keep this if you want a required-reviewers gate before
+    # publishing to PyPI. The environment must exist in
+    # Settings → Environments. Drop the line for an unguarded publish.
+    environment: pypi
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -60,3 +62,5 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
